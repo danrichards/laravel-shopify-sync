@@ -1,0 +1,36 @@
+{
+    "name": "dan/laravel-shopify-app",
+    "description": "Laravel solution for Shopify apps",
+    "license": "MIT",
+    "keywords": ["laravel"],
+    "type": "project",
+    "authors": [
+        {
+            "name": "Dan Richards",
+            "email": "danrichardsri@gmail.com"
+        }
+    ],
+    "autoload" : {
+        "psr-4": {
+            "Dan\\Shopify\\Laravel\\": "src/"
+        },
+        "files": [
+            "src/Support/helpers.php"
+        ]
+    },
+    "require": {
+        "php": ">=5.6",
+        "illuminate/cache": "5.3.*|5.4.*|5.5.*|5.6.*|5.7.*",
+        "illuminate/database": "5.3.*|5.4.*|5.5.*|5.6.*|5.7.*",
+        "illuminate/support": "5.3.*|5.4.*|5.5.*|5.6.*|5.7.*",
+        "dan/laravel-more": ">=0.0.14",
+        "dan/shopify": ">=2.1.10"
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Dan\\Shopify\\Laravel\\Providers\\ServiceProvider"
+            ]
+        }
+    }
+}
