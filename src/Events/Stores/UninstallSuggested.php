@@ -1,6 +1,6 @@
 <?php
 
-namespace Dan\Shopify\Laravel\Events;
+namespace Dan\Shopify\Laravel\Events\Stores;
 
 use Dan\Shopify\Laravel\Models\Store;
 
