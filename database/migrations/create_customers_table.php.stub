@@ -1,0 +1,90 @@
+<?php
+
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Migrations\Migration;
+
+/**
+ * Class CreateCustomersTable
+ */
+class CreateCustomersTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        if (Schema::hasTable('customers')) {
+            return;
+        }
+
+        Schema::create('customers', function (Blueprint $table) {
+            $table->increments('id');
+
+            $table->unsignedInteger('last_order_id')->nullable();
+
+            $table->string('store_type')->default(addslashes(\Dan\Shopify\Laravel\Models\Store::class));
+            $table->unsignedInteger('store_id')->nullable();
+
+            $table->string('store_customer_id', 19)->nullable();
+            $table->string('store_last_order_id', 19)->nullable();
+            $table->string('admin_graphql_api_id', 64)->nullable();
+
+            $table->string('email', 255);
+            $table->string('first_name', 255)->nullable();
+            $table->string('last_name', 255)->nullable();
+            $table->string('company', 255)->nullable();
+            $table->string('phone', 255)->nullable();
+            $table->string('address1', 255)->nullable();
+            $table->string('address2', 255)->nullable();
+            $table->string('city', 255)->nullable();
+            $table->string('zip', 255)->nullable();
+            $table->string('province_code', 255)->nullable();
+            $table->string('country', 255)->nullable();
+            $table->string('country_code', 2)->nullable();
+            $table->string('country_name', 255)->nullable();
+            $table->string('locale')->nullable();
+            $table->tinyInteger('accepts_marketing')->default(1);
+            $table->text('note')->nullable();
+
+            $table->text('tags')->nullable();
+            $table->text('default_address')->nullable();
+
+            $table->string('currency', 4)->nullable();
+            $table->integer('orders_count')->default(0);
+            $table->decimal('total_spent', 10, 2)->default(0.00);
+            $table->string('last_order_name', 19)->nullable();
+            $table->boolean('tax_exempt')->default(0);
+            $table->boolean('verified_email')->default(1);
+            $table->string('multipass_identifier')->nullable();
+
+            $table->timestamp('store_created_at')->nullable();
+            $table->timestamp('store_updated_at')->nullable();
+
+            $table->timestamp('synced_at')->nullable();
+
+            $table->nullableTimestamps();
+            $table->softDeletes();
+
+            $table->index('last_order_id', 'customers_last_order_id_index');
+            $table->index('store_last_order_id', 'customers_store_last_order_id_index');
+            $table->index('accepts_marketing', 'customers_accepts_marketing_index');
+            $table->index(['store_type', 'store_id'], 'customer_store_type_store_id_index');
+            $table->unique(['store_type', 'store_id', 'email'], 'customers_email_unique');
+            $table->index('store_created_at', 'customers_created_at_index');
+            $table->index('deleted_at', 'customers_deleted_at_index');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('customers');
+    }
+}

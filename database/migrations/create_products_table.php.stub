@@ -1,0 +1,76 @@
+<?php
+
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Migrations\Migration;
+
+/**
+ * Class CreateProductsTable
+ */
+class CreateProductsTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        if (Schema::hasTable('products')) {
+            return;
+        }
+
+        Schema::create('products', function (Blueprint $table) {
+            $table->increments('id');
+
+            $table->string('store_type', 255)->default(\App\Models\Store::class);
+            $table->unsignedInteger('store_id');
+            $table->string('store_product_id', 19);
+
+            $table->string('admin_graphql_api_id', 64)->nullable();
+            $table->string('title', 255)->nullable();
+            $table->text('body_html')->nullable();
+            $table->string('vendor', 128)->nullable();
+            $table->string('product_type', 255)->nullable();
+            $table->string('handle', 255)->nullable();
+            $table->string('template_suffix', 32)->nullable();
+            $table->string('published_scope', 16)->nullable();
+            $table->text('tags')->nullable();
+            $table->text('options')->nullable();
+            $table->text('images')->nullable();
+            $table->text('image')->nullable();
+
+            $table->text('metafields')->nullable();
+
+            $table->timestamp('published_at')->nullable();
+
+            $table->timestamp('store_created_at')->nullable();
+            $table->timestamp('store_updated_at')->nullable();
+
+            $table->timestamp('synced_at')->nullable();
+            $table->nullableTimestamps();
+            $table->softDeletes();
+
+            // ---
+
+            $table->index(['store_type', 'store_id'], 'products_store_type_store_id_index');
+            $table->index('store_product_id', 'products_store_product_id_index');
+            $table->index('admin_graphql_api_id', 'products_admin_graphql_api_id_index');
+            $table->index('vendor', 'products_vendor_index');
+            $table->index('product_type', 'products_product_type_index');
+            $table->index('handle', 'products_handle_index');
+            $table->index('created_at', 'products_store_created_at_index');
+            $table->index('deleted_at', 'products_store_deleted_at_index');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('products');
+    }
+}

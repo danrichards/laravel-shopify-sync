@@ -1,0 +1,90 @@
+<?php
+
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Database\Migrations\Migration;
+
+/**
+ * Class CreateOrderItemsTable
+ */
+class CreateOrderItemsTable extends Migration
+{
+    /**
+     * Run the migrations.
+     *
+     * @return void
+     */
+    public function up()
+    {
+        if (Schema::hasTable('order_items')) {
+            return;
+        }
+
+        Schema::create('order_items', function (Blueprint $table) {
+            $table->increments('id');
+
+            $table->unsignedInteger('order_id');
+            $table->unsignedInteger('product_id');
+            $table->unsignedInteger('variant_id');
+
+            $table->string('store_line_item_id', 32);
+            $table->string('store_product_id', 32)->nullable();
+            $table->string('store_variant_id', 32)->nullable();
+            $table->string('store_fulfillment_id', 19)->nullable();
+            $table->string('admin_graphql_api_id', 64)->nullable();
+
+            $table->string('name', 255)->nullable();
+            $table->string('title', 255)->nullable();
+            $table->string('variant_title', 255)->nullable();
+            $table->integer('quantity')->default(1);
+            $table->decimal('price', 8, 2)->default(0.00);
+            $table->text('price_set')->nullable();
+            $table->decimal('total_discount', 8, 2)->default(0.00);
+            $table->text('total_discount_set')->nullable();
+            $table->text('discount_allocations')->nullable();
+            $table->boolean('gift_card')->nullable();
+            $table->integer('grams')->default(0);
+            $table->string('sku', 255)->nullable();
+            $table->string('vendor', 255)->nullable();
+            $table->text('properties')->nullable();
+            $table->boolean('taxable')->default(1);
+            $table->text('tax_lines')->nullable();
+            $table->boolean('requires_shipping')->default(1);
+            $table->boolean('product_exists')->default(1);
+
+            $table->string('fulfillment_service', 255)->nullable();
+            $table->string('fulfillment_status', 255)->nullable();
+            $table->integer('fulfillable_quantity')->default(1);
+            $table->timestamp('fulfilled_at')->nullable();
+
+            $table->string('variant_inventory_management', 255)->nullable();
+            $table->text('origin_location')->nullable();
+
+            $table->timestamp('synced_at')->nullable();
+
+            $table->softDeletes();
+            $table->nullableTimestamps();
+
+            $table->index('order_id', 'order_items_order_id_index');
+            $table->index('product_id', 'order_items_product_id_index');
+            $table->index('variant_id', 'order_items_variant_id_index');
+            $table->index('store_line_item_id', 'order_items_store_line_item_id_index');
+            $table->index('store_product_id', 'order_items_store_product_id_index');
+            $table->index('store_variant_id', 'order_items_store_variant_id_index');
+            $table->index('store_fulfillment_id', 'order_items_store_fulfillment_id_index');
+            $table->index('sku', 'order_items_sku_index');
+            $table->index('created_at', 'order_items_created_at_index');
+            $table->index('deleted_at', 'order_items_deleted_at_index');
+        });
+    }
+
+    /**
+     * Reverse the migrations.
+     *
+     * @return void
+     */
+    public function down()
+    {
+        Schema::dropIfExists('order_items');
+    }
+}
