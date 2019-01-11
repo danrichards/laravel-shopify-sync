@@ -109,7 +109,7 @@ class ProductService
 
             $trace = Util::exceptionArr($e);
 
-            $this->msg('emergency', 'create', compact('trace'));
+            $this->msg('create', compact('trace'), 'emergency');
 
             if (config('shopify.sync.throw_processing_exceptions')) {
                 throw $e;
@@ -142,32 +142,14 @@ class ProductService
      */
     protected function fill(array $product_data, array $attributes = [])
     {
-        $shopify_data = [];
-
-        $map = config('shopify.products.map');
-        $product_dates = $this->product->getDates();
-
-        foreach ($map as $key => $field) {
-            $value = array_get($product_data, $key);
-
-            \Log::info(__FUNCTION__, compact('key', 'field', 'value'));
-
-            switch (true) {
-                // Set those troublesome ISO 8601 dates.
-                case in_array($field, $product_dates):
-                    $value = $value ? Carbon::parse($value) : $value;
-                    break;
-                case method_exists($this->util(), $method = Str::camel("fill_product_{$field}")):
-                    $value = $this->util()->$method($product_data, $this->product);
-                    break;
-            }
-
-            $shopify_data[$field] = $value;
-        }
+        $mapped_data = $this->util()->mapData(
+            $data = $product_data,
+            $map = config('shopify.products.map'),
+            $model = $this->product->exists ? $this->product : config('shopify.products.model'));
 
         $data = $attributes
-            + $shopify_data
-            + $this->store->unmorph()
+            + $mapped_data
+            + $this->store->unmorph('store')
             + ['synced_at' => new Carbon('now')];
 
         $this->product->fill($data);
@@ -247,23 +229,27 @@ class ProductService
     }
 
     /**
+     * @param string $msg
+     * @param array $data
      * @param string $level
-     * @param string $extra
-     * @param array $extra_data
-     * @return string
+     * @return void
      */
-    public function msg($level = 'emergency', $extra = '', array $extra_data = [])
+    public function msg($msg = '', $data = [], $level = 'emergency')
     {
-        $api_product_id = $this->product_data['id'] ?? $this->product->store_product_id;
+        $store = $this->getStore();
 
-        $extra = strlen($extra) ? ':'.$extra : $extra;
+        $parts = explode('\\', get_called_class());
+        $parts = array_slice($parts, 3);
+        $parts = array_map('\Illuminate\Support\Str::snake', $parts);
+        $parts[] = $store->myshopify_domain;
+        $parts[] = $msg;
 
-        $msg = "cmd:shopify_product_service:{$this->getStore()->myshopify_domain}{$extra}:id:{$api_product_id}";
-        $data = empty($this->product_data) ? [$this->product] : $this->product_data;
-
+        $msg = implode(':', array_filter($parts));
+        $data += $store->compact()
+            + ['id' => optional($this->product)->getKey() ?: $this->product_data['id'] ?? null];
 
         Log::channel(config('shopify.sync.log_channel'))
-            ->$level($msg, $data + $extra_data);
+            ->$level((string) $msg, (array) $data);
     }
 
     /**
@@ -313,7 +299,7 @@ class ProductService
             DB::rollBack();
             $trace = Util::exceptionArr($e);
 
-            $this->msg('emergency', 'update', compact('trace'));
+            $this->msg('update', compact('trace'), 'emergency');
 
             if (config('services.shopify.app.throw_processing_exceptions')) {
                 throw $e;

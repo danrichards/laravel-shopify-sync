@@ -1,7 +1,8 @@
 <?php
 
-namespace Dan\Shopify\Laravel\Jobs\Products;
+namespace Dan\Shopify\Laravel\Jobs\Orders;
 
+use Cache;
 use Carbon\Carbon;
 use Dan\Shopify\Laravel\Events\Stores\UninstallSuggested;
 use Dan\Shopify\Laravel\Jobs\AbstractStoreJob;
@@ -56,7 +57,8 @@ class ImportStore extends AbstractStoreJob
         $limit = $this->params['limit'] ?? config('shopify.sync.limit');
         $order = $this->params['order'] ?? 'created_at asc';
         $connection = $this->connection;
-        $created_at_min = $this->getCreatedAtMin($store);
+
+        $created_at_min = $this->getCreatedAtMin();
 
         if (static::hasLockFor($store)) {
             $this->msg('is_locked', [], 'warning');
@@ -66,23 +68,22 @@ class ImportStore extends AbstractStoreJob
         try {
             static::lock($store);
 
-            // Determine how much there is to sync.
             $total = $this->getApiClient()
-                ->products
+                ->orders
                 ->get(compact('created_at_min', 'order'), 'count')
                 ['count'];
+
             $pages = range(1, ceil($total / $limit));
             $params = compact('order', 'limit', 'created_at_min');
 
             $page_job = new ImportStorePage($store, $pages, $params, $connection, $this->dryrun);
 
-            // Fire job to sync the first page.
             $connection == 'sync'
                 ? dispatch_now($page_job)
-                : dispatch($page_job)->onQueue($connection);
+                : dispatch($page_job)->onConnection($connection);
 
             $verb = $connection == 'sync' ? 'first_page_dispatched' : 'first_page_queued';
-            $this->msg($verb, [], 'info');
+            $this->msg($verb, compact('pages', 'params'), 'info');
         } catch (ClientException $ce) {
             $this->handleClientException($ce);
         } catch (Exception $e) {
@@ -90,6 +91,33 @@ class ImportStore extends AbstractStoreJob
         }
 
         return $this;
+    }
+
+    /**
+     * @param Store $store
+     * @return bool
+     */
+    public static function hasLockFor(Store $store)
+    {
+        return boolval(Cache::get(__CLASS__.'|'.$store->getKey()));
+    }
+
+    /**
+     * @param Store $store
+     * @param int $minutes
+     */
+    public static function lock(Store $store, $minutes = null)
+    {
+        $minutes = $minutes ?: config('shopify.sync.lock');
+        Cache::put(__CLASS__.'|'.$store->getKey(), $lock = true, $minutes);
+    }
+
+    /**
+     * @param Store $store
+     */
+    public static function unlock(Store $store)
+    {
+        Cache::forget(__CLASS__.'|'.$store->getKey());
     }
 
     /**
@@ -106,11 +134,12 @@ class ImportStore extends AbstractStoreJob
                 break;
             default:
                 $data = Util::exceptionArr($e);
-                $msg = "queue_failed";
+                $msg = "queue_job_failed";
         }
 
-        $this->msg($msg, $data);
+        $this->msg($msg, $data, 'emergency');
     }
+
 
     /**
      * @return string
@@ -119,9 +148,9 @@ class ImportStore extends AbstractStoreJob
     {
         // Determine if the created_at_min if not give or set to `last`
         if (empty($this->params['created_at_min']) || $this->params['created_at_min'] == 'last') {
-            return $this->getStore()->last_product_import_at
+            return $this->getStore()->last_order_import_at
                 // The last time there was a successful sync
-                ? $this->getStore()->last_product_import_at ->format('c')
+                ? $this->getStore()->last_order_import_at ->format('c')
                 // First sync? Then use the store created at date!
                 : $this->getStore()->store_created_at->format('c');
         }
@@ -134,7 +163,7 @@ class ImportStore extends AbstractStoreJob
     /**
      * @param $ce
      */
-    public function handleClientException($ce): void
+    protected function handleClientException($ce): void
     {
         static::unlock($this->getStore());
 
@@ -152,7 +181,7 @@ class ImportStore extends AbstractStoreJob
     /**
      * @param Exception $e
      */
-    public function handleException(Exception $e): void
+    protected function handleException(Exception $e): void
     {
         static::unlock($this->getStore());
 

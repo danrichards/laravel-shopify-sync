@@ -103,7 +103,6 @@ abstract class AbstractStoreJob extends AbstractJob
      */
     protected static function storeMsg(Store $store, $msg = '', array $data = [], $level = 'error')
     {
-
         $parts = explode('\\', get_called_class());
         $parts = array_slice($parts, 3);
         $parts = array_map('\Illuminate\Support\Str::snake', $parts);

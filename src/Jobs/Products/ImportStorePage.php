@@ -32,9 +32,6 @@ class ImportStorePage extends AbstractStoreJob
     /** @var bool $dryrun */
     protected $dryrun;
 
-    /** @var bool $now */
-    protected $now;
-
     /** @var int $page */
     protected $page;
 
@@ -103,9 +100,9 @@ class ImportStorePage extends AbstractStoreJob
                 ->products
                 ->get($params + compact('page'));
 
-            $this->msg('received', [], 'info');
+            $this->msg('received', ['count' => count($api_products)], 'info');
 
-            $existing_ids = $this->existingProductIds($api_products, $store);
+            $existing_ids = $this->existingProductIds($api_products);
 
             $this->msg('existing', compact('existing_ids'), 'info');
 
@@ -121,7 +118,7 @@ class ImportStorePage extends AbstractStoreJob
 
                     $connection == 'sync'
                         ? dispatch_now($job)
-                        : dispatch($job)->onQueue($connection);
+                        : dispatch($job)->onConnection($connection);
                 }
 
                 $last_product_import_at = Carbon::parse($api_product['created_at']);
@@ -143,8 +140,8 @@ class ImportStorePage extends AbstractStoreJob
             } else {
                 sleep($page_sleep);
                 $next_page = new static($store, $this->pages, $this->params, $connection, $this->dryrun);
-                $connection != 'now'
-                    ? dispatch($next_page)->onQueue($connection)
+                $connection == 'sync'
+                    ? dispatch($next_page)->onConnection($connection)
                     : dispatch_now($next_page);
             }
         } catch (ClientException $ce) {
@@ -187,9 +184,9 @@ class ImportStorePage extends AbstractStoreJob
                         $params = compact('created_at_min', 'limit') + $this->params,
                         $connection = $this->connection);
 
-                    $connection != 'now'
-                        ? dispatch($job)->onConnection($connection)
-                        : dispatch_now($job);
+                    $connection == 'sync'
+                        ? dispatch_now($job)
+                        : dispatch($job)->onConnection($connection);
                 }
                 break;
             default:
@@ -199,16 +196,15 @@ class ImportStorePage extends AbstractStoreJob
 
     /**
      * @param array $api_products
-     * @param Store $store
      * @return array
      */
-    protected function existingProductIds(array $api_products, Store $store): array
+    protected function existingProductIds(array $api_products): array
     {
         $api_product_ids = array_pluck($api_products, 'id');
 
         $existing_db_products = DB::table('products')
             ->where('store_type', Store::class)
-            ->where('store_id', $store->getKey())
+            ->where('store_id', $this->getStore()->getKey())
             ->whereIn('store_product_id', $api_product_ids)
             ->pluck('store_product_id')
             ->all();

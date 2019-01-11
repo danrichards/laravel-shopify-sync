@@ -3,7 +3,7 @@
 namespace Dan\Shopify\Laravel\Console;
 
 use Carbon\Carbon;
-use Dan\Shopify\Laravel\Jobs\Products\ImportStore;
+use Dan\Shopify\Laravel\Jobs\Orders\ImportStore;
 use Dan\Shopify\Laravel\Models\Store;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
@@ -11,23 +11,23 @@ use Log;
 use Symfony\Component\Console\Output\OutputInterface;
 
 /**
- * Class ImportProductsAndVariants
+ * Class ImportOrders
  */
-class ImportProductsAndVariants extends AbstractCommand
+class ImportOrders extends AbstractCommand
 {
     /**
      * The name and signature of the console command.
      *
      * @var string $signature
      */
-    protected $signature = 'shopify:import:products {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_product_import_at_max=now}';
+    protected $signature = 'shopify:import:orders {--dryrun} {--now} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_order_import_at_max=now}';
 
     /**
      * The console command description.
      *
      * @var string $description
      */
-    protected $description = 'Verify and sync recent products.';
+    protected $description = 'Verify and sync orders.';
 
     /** @var int $chunk_size */
     protected static $chunk_size = 100;
@@ -65,6 +65,8 @@ class ImportProductsAndVariants extends AbstractCommand
      */
     protected function getQuery()
     {
+        $last_order_import_at_max = new Carbon($this->option('last_order_import_at_max'));
+
         $store_model = config('shopify.stores.model', Store::class);
         /** @var \Dan\Shopify\Laravel\Models\Store $store_model */
         $store_model = new $store_model;
@@ -74,38 +76,17 @@ class ImportProductsAndVariants extends AbstractCommand
             ->newQuery()
             ->select('stores.*')
             ->forInstalled()
-            ->when($this->optionIds('store_ids'),
-                $this->getStoreIdQuery($table),
-                $this->getTimestampQuery($table));
-    }
-
-    /**
-     * @param string $table
-     * @return \Closure
-     */
-    protected function getStoreIdQuery($table)
-    {
-        return function(Builder $query, $store_ids) use($table) {
-            $query->whereIn("{$table}.id", $store_ids);
-        };
-    }
-
-    /**
-     * @param string $table
-     * @return \Closure
-     */
-    protected function getTimestampQuery($table)
-    {
-        return function(Builder $query) use ($table) {
-            $query->whereNull("{$table}.last_product_import_at")
-                ->orWhere(function (Builder $q2) use ($table) {
-                    $last_product_import_at_max = new Carbon($this->option('last_product_import_at_max'));
-                    $q2->where("{$table}.last_product_import_at", '<', $last_product_import_at_max)
-                        ->when($this->option('created_at_min'), function(Builder $q3, $created_at_min) use ($table) {
-                            $q3->where("{$table}.last_product_import_at", '<', $created_at_min);
-                        });
-                });
-        };
+            ->where(function (Builder $query) use ($last_order_import_at_max, $table) {
+                $query
+                    ->where(function(Builder $q2) use ($table) {
+                        $q2->whereNull("{$table}.last_order_import_at")
+                            ->whereNotNull("{$table}.last_product_import_at");
+                    })
+                    ->orWhere("{$table}.last_product_import_at", '>', "{$table}.last_order_import_at");
+            })
+            ->when($this->optionIds('store_ids'), function(Builder $query, $store_ids) use($table) {
+                $query->whereIn("{$table}.id", $store_ids);
+            });
     }
 
     /**
@@ -119,10 +100,10 @@ class ImportProductsAndVariants extends AbstractCommand
         $connection = $this->option('connection');
 
         if (empty(config("queue.connections.{$connection}"))) {
-            $this->throwConnectionError();
+            $this->throwConnectionException();
         }
 
-        $this->log($store, $connection);
+        $this->log($store);
 
         $job = new ImportStore($store, $params, $connection, $dryrun);
 
@@ -132,30 +113,12 @@ class ImportProductsAndVariants extends AbstractCommand
     }
 
     /**
-     * @param string $connection
-     * @throws Exception
-     */
-    protected function throwConnectionError()
-    {
-        $valid_connections = array_keys(config('queue.connections'));
-        $last_valid = array_pop($valid_connections);
-        $message = "The queue connection \"{$this->option('connection')}\" is not valid. Use: "
-            .implode(', ', $valid_connections). "or {$last_valid}";
-
-        $this->error($message);
-
-        throw new Exception($message);
-    }
-
-    /**
      * @param $store
-     * @param $connection
      */
-    protected function log($store, $connection): void
+    protected function log($store): void
     {
-        $verb = $connection == 'sync' ? 'dispatched' : 'queued';
-
-        $msg = "console:shopify:products:import:{$store->myshopify_domain}:$verb";
+        $verb = $this->option('now') ? 'dispatched' : 'queued';
+        $msg = "cmd:shopify:orders:sync:{$store->myshopify_domain}:$verb";
         Log::channel(config('shopify.sync.log_channel'))
             ->info($msg, $store->compact());
 
@@ -164,9 +127,24 @@ class ImportProductsAndVariants extends AbstractCommand
         }
     }
 
+    /**
+     * @throws Exception
+     */
+    protected function throwConnectionException(): void
+    {
+        $valid_connections = array_keys(config('queue.connections'));
+        $last_valid = array_pop($valid_connections);
+        $message = "The queue connection \"{$this->option('connection')}\" is not valid. Use: "
+            . implode(', ', $valid_connections) . "or {$last_valid}";
+
+        throw new Exception($message);
+    }
+
     protected function logCount(): void
     {
-        if ($this->v()) {
+        $this->verbosity = $this->getOutput()->getVerbosity();
+
+        if ($this->verbosity % OutputInterface::VERBOSITY_VERBOSE == 0) {
             $count = $this->getQuery()->count();
             $count
                 ? $this->info("{$count} stores found. Syncing...")

@@ -2,11 +2,14 @@
 
 namespace Dan\Shopify\Laravel\Support;
 
+use Carbon\Carbon;
 use Dan\Shopify\Laravel\Models\Order;
 use Dan\Shopify\Laravel\Models\OrderItem;
 use Dan\Shopify\Laravel\Models\Product;
 use Dan\Shopify\Laravel\Models\Variant;
 use Exception;
+use Illuminate\Support\Str;
+use More\Laravel\Model;
 
 /**
  * Class Util
@@ -17,7 +20,7 @@ class Util
      * @param array $line_item_data
      * @return bool
      */
-    public static function qualifyLineItemImport(array $line_item_data)
+    public static function qualifyOrderItemImport(array $line_item_data)
     {
         return true;
     }
@@ -107,6 +110,42 @@ class Util
         return static::dictionaryMergeNameValues([], $name_values);
     }
 
+
+    /**
+     * @param array $data
+     * @param array $map
+     * @param string|Model $model
+     * @return array
+     */
+    public static function mapData(array $data, array $map, $model): array
+    {
+        $mapped = [];
+
+        $dates = is_object($model)
+            ? $model->getDates()
+            : (new $model)->getDates();
+
+        foreach ($map as $key => $field) {
+            $value = array_get($data, $key);
+            $base = class_basename($model);
+            $fill_mutator = "fill{$base}".Str::studly($field);
+
+            switch (true) {
+                // Set those troublesome ISO 8601 dates.
+                case in_array($field, $dates):
+                    $value = $value ? Carbon::parse($value) : $value;
+                    break;
+                case method_exists(new static, $fill_mutator):
+                    $value = static::$fill_mutator($data, is_object($model) ? $model : null);
+                    break;
+            }
+
+            $mapped[$field] = $value;
+        }
+
+        return $mapped;
+    }
+
     /**
      * @param array $name_values
      * @param array $dictionary
@@ -189,7 +228,7 @@ class Util
      * @param int $limit
      * @return array
      */
-    public static function exceptionTraceArr(Exception $e, $limit = 10)
+    public static function exceptionTraceArr(Exception $e, $limit = 20)
     {
         $trace = array_map(function($t) {
             return [
