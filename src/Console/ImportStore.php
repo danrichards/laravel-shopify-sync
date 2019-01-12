@@ -30,7 +30,7 @@ class ImportStore extends AbstractCommand
         $client = Shopify::make($shop, $token);
 
         try {
-            $data = $client->shop() + compact('token');
+            $data = $client->shop();
             (new StoreService($data))->setToken($token)->create();
         } catch (Exception $e) {
             $this->error($e->getMessage());
