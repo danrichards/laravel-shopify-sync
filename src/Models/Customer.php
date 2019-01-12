@@ -104,6 +104,20 @@ class Customer extends Model
     }
 
     /**
+     * @param string $email
+     * @param Store|null $store
+     * @return static|null
+     */
+    public static function findByStoreCustomerId($email, $store = null)
+    {
+        return static::where('email', $email)
+            ->when($store, function(Builder $q, $s) {
+                $q->whereMorph($s, 'store');
+            })
+            ->first();
+    }
+
+    /**
      * @param Store|null $store
      * @return static|null
      */

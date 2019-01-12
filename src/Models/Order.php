@@ -146,14 +146,13 @@ class Order extends Model
      * @param Store $store
      * @return Order|null
      */
-    public static function findByStoreOrderId($shopify_order_id, Store $store = null)
+    public static function findByStoreOrderId($shopify_order_id, $store = null)
     {
-        return $store
-            ? static::where('store_order_id', $shopify_order_id)
-                ->whereMorph($store, 'store')
-                ->first()
-            : static::where('store_order_id', $shopify_order_id)
-                ->first();
+        return static::where('store_order_id', $shopify_order_id)
+            ->when($store, function(Builder $q, $s) {
+                $q->whereMorph($s);
+            })
+            ->first();
     }
 
     /**
@@ -161,7 +160,7 @@ class Order extends Model
      * @param Store $store
      * @return Order|null
      */
-    public static function findByNumber($number, Store $store)
+    public static function findByNumber($number, $store)
     {
         return static::where('number', $number)
             ->whereMorph($store, 'store')
