@@ -22,7 +22,7 @@ class Util
      */
     public static function qualifyOrderItemImport(array $line_item_data)
     {
-        return true;
+        return ! empty($line_item_data['product_id']) && ! empty($line_item_data['product_id']);
     }
 
     /**
@@ -57,9 +57,9 @@ class Util
      * @param OrderItem|null $order_item
      * @return bool
      */
-    public static function qualifyLineItemUpdate(array $line_item_data, OrderItem $order_item = null)
+    public static function qualifyOrderItemUpdate(array $line_item_data, OrderItem $order_item = null)
     {
-        return true;
+        return ! empty($line_item_data['product_id']) && ! empty($line_item_data['product_id']);
     }
 
     /**

@@ -2,31 +2,22 @@
 
 namespace Dan\Shopify\Laravel\Support;
 
-use Dan\Shopify\Laravel\Events\Orders\CancellationRefused;
-use Dan\Shopify\Laravel\Events\Orders\Cancelled;
 use Dan\Shopify\Laravel\Events\Orders\Created;
-use Dan\Shopify\Laravel\Events\Orders\Refunded;
-use Dan\Shopify\Laravel\Events\Orders\RefundRefused;
-use Dan\Shopify\Laravel\Events\Orders\RiskAccessed;
 use Dan\Shopify\Laravel\Models\Customer;
 use Dan\Shopify\Laravel\Models\Order;
 use Dan\Shopify\Laravel\Models\OrderItem;
 use Dan\Shopify\Laravel\Models\Store;
-use Dan\Shopify\Laravel\Models\Variant;
 use Dan\Shopify\Models\Order as ShopifyOrder;
 use BadMethodCallException;
 use Carbon\Carbon;
-use DateTime;
 use DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
-use Illuminate\Support\Str;
-use Log;
 
 /**
  * Class OrderService
  */
-class OrderService
+class OrderService extends AbstractService
 {
     /**
      * After order creation, these fields may no longer be updated.
@@ -87,29 +78,26 @@ class OrderService
     /** @var Collection|null $order_items */
     protected $order_items = null;
 
-    /** @var Store $shopify_store */
-    protected $shopify_store;
-
     /** @var Collection $variants */
     protected $variants;
 
     /**
      * ShopifyOrderService constructor.
      *
-     * @param Store $shopify_store
+     * @param Store $store
      * @param array $order_data
      * @param Order|null $order
-     * @param bool $scaffold_products_and_variants
      */
-    public function __construct(Store $shopify_store, array $order_data = [], Order $order = null, $scaffold_products_and_variants = true)
+    public function __construct(Store $store, array $order_data = [], Order $order = null)
     {
-        $this->shopify_store = $shopify_store;
+        parent::__construct($store);
+
         $this->order_data = $order_data;
         $order_model = config('shopify.orders.model');
 
         // SANITY CHECK: Command is often queued, check again if the order exists.
         if (isset($order_data['id']) && empty($order)) {
-            if ($existing = $order_model::findByStoreOrderId($order_data['id'], $shopify_store)) {
+            if ($existing = $order_model::findByStoreOrderId($order_data['id'], $store)) {
                 $this->order = $order = $existing;
             }
         }
@@ -195,10 +183,8 @@ class OrderService
 
             $this->customer->save();
 
-            $this->fill($this->order_data, $attributes);
-
-            \Log::debug(__FUNCTION__, $this->order->getAttributes());
-
+            $this->fillMap($this->order_data);
+            $this->order->fill($attributes);
             $this->order->save();
 
             $item_quantities = [];
@@ -218,6 +204,7 @@ class OrderService
                 ->sum(function($item) {
                     return static::refundedQuantityForLineItem($this->order_data, $item['id']);
                 });
+
             \Log::debug('refunds', compact('refunded_quantity')
                 + ['refunds' => array_get($this->order_data, 'refunds')]);
             // If the order is already completely refunded, just cancel it.
@@ -285,9 +272,8 @@ class OrderService
      */
     protected function fillNewOrderItem(array $line_item, array $attributes = [])
     {
-        if (empty($variant = $this->findVariant($line_item['variant_id'] ?? 0))) {
-            throw new BadMethodCallException('Variant not found');
-        }
+        $variant = $this->getQualifiedVariants()[$line_item['variant_id']];
+
         if (empty($product = $variant->product()->withTrashed()->first())) {
             throw new BadMethodCallException('Product not found');
         }
@@ -323,17 +309,15 @@ class OrderService
 
     /**
      * @param $order_data
-     * @param array $attributes
      * @return Order
      */
-    protected function fill(array $order_data, array $attributes = [])
+    protected function fillMap(array $order_data)
     {
         $map = config('shopify.orders.map');
         $model = $this->order ?: config('shopify.orders.model');
         $mapped_data = $this->util()::mapData($order_data, $map, $model);
 
-        $data = $attributes
-            + $mapped_data
+        $data = $mapped_data
             + $this->getStore()->unmorph('store')
             + $this->customer->compact('customer')
             + ['synced_at' => new Carbon('now')];
@@ -392,14 +376,6 @@ class OrderService
         return $this->order_items;
     }
 
-    /**
-     * @return Store
-     */
-    public function getStore(): Store
-    {
-        return $this->shopify_store;
-    }
-
 //    /**
 //     * @return float
 //     */
@@ -442,6 +418,9 @@ class OrderService
         return collect($line_items)
             ->filter(function(array $line_item) use ($ids) {
                 return $ids->has($line_item['variant_id']);
+            })
+            ->filter(function(array $line_item) {
+                return $this->util()->qualifyOrderItemImport($line_item);
             })
             ->keyBy('id');
     }
@@ -494,30 +473,6 @@ class OrderService
     }
 
     /**
-     * @param string $msg
-     * @param array $data
-     * @param string $level
-     * @return void
-     */
-    public function msg($msg = '', $data = [], $level = 'emergency')
-    {
-        $store = $this->getStore();
-
-        $parts = explode('\\', get_called_class());
-        $parts = array_slice($parts, 3);
-        $parts = array_map('\Illuminate\Support\Str::snake', $parts);
-        $parts[] = $store->myshopify_domain;
-        $parts[] = $msg;
-
-        $msg = implode(':', array_filter($parts));
-        $data += $store->compact()
-            + ['id' => optional($this->order)->getKey() ?: $this->order_data['id'] ?? null];
-
-        Log::channel(config('shopify.sync.log_channel'))
-            ->$level((string) $msg, (array) $data);
-    }
-
-    /**
      * @param array $order_data
      * @param $line_item_id
      * @return int
@@ -549,10 +504,9 @@ class OrderService
 //     * @return Order
 //     * @throws Exception
 //     */
-//    public function update(array $attributes =  [])
+//    public function update(array $product_data, array $attributes =  [])
 //    {
-//        $this->fillCustomer();
-//
+
 //        $this->fill($this->order_data, $attributes);
 //
 //        $order_items = $this->order_items->keyBy('store_line_item_id');
@@ -704,11 +658,4 @@ class OrderService
 //        return $this;
 //    }
 
-    /**
-     * @return Util
-     */
-    protected function util()
-    {
-        return app(config('shopify.util'));
-    }
 }

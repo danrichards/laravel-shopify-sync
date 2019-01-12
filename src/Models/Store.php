@@ -20,6 +20,8 @@ use More\Laravel\Traits\Model\BelongsToUser;
  *
  * @see Traits for property references.
  *
+ * @method Builder|static forInstalled()
+ * @method Builder|static forUninstalled()
  * @property string $address1
  * @property string $address2
  * @property bool|null $checkout_api_supported
@@ -29,6 +31,7 @@ use More\Laravel\Traits\Model\BelongsToUser;
  * @property string $country_name
  * @property bool|null $county_taxes
  * @property string $currency
+ * @property int $customer_count
  * @property string $customer_email
  * @property Carbon $created_at
  * @property Carbon $deleted_at
@@ -176,27 +179,12 @@ class Store extends Model implements HasShopifyClientInterface
     }
 
     /**
-     * @param string $store_order_id
-     * @return Order|null
+     * @param $value
+     * @return string
      */
-    public function findOrderByStoreId($store_order_id)
+    public function getShopAttribute($value)
     {
-        return Order::where('store_order_id', $store_order_id)
-            ->whereMorph($this, 'store')
-            ->first();
-    }
-
-    /**
-     * @param string $store_line_item_id
-     * @return Order|null
-     */
-    public function findOrderLineItemByStoreId($store_line_item_id)
-    {
-        return OrderItem::select('order_items.*')
-            ->join('orders', 'orders.id', '=', 'order_items.order_id')
-            ->where('store_line_item_id', $store_line_item_id)
-            ->whereMorph($this)
-            ->first();
+        return $this->attributes['myshopify_domain'];
     }
 
     /**

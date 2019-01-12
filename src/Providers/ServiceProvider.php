@@ -4,6 +4,8 @@ namespace Dan\Shopify\Laravel\Providers;
 
 use Dan\Shopify\Laravel\Console\ImportOrders;
 use Dan\Shopify\Laravel\Console\ImportProductsAndVariants;
+use Dan\Shopify\Laravel\Console\ImportStore;
+use Dan\Shopify\Laravel\Console\UpdateStores;
 use Illuminate\Support\ServiceProvider as BaseServiceProvider;
 
 /**
@@ -20,6 +22,8 @@ class ServiceProvider extends BaseServiceProvider
         $this->commands([
             ImportOrders::class,
             ImportProductsAndVariants::class,
+            ImportStore::class,
+            UpdateStores::class,
         ]);
 
         $base = __DIR__.'/../../database/migrations/';

@@ -15,18 +15,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class ImportOrders extends AbstractCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string $signature
-     */
+    /** @var string $signature */
     protected $signature = 'shopify:import:orders {--dryrun} {--now} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_order_import_at_max=now}';
 
-    /**
-     * The console command description.
-     *
-     * @var string $description
-     */
+    /** @var string $description */
     protected $description = 'Verify and sync orders.';
 
     /** @var int $chunk_size */

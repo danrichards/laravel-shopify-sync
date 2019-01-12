@@ -11,12 +11,11 @@ use DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Str;
-use Log;
 
 /**
  * Class ProductService
  */
-class ProductService
+class ProductService extends AbstractService
 {
     /** @var Product|null $product */
     protected $product = null;
@@ -30,9 +29,6 @@ class ProductService
     /** @var array $variants_data */
     protected $variants_data = [];
 
-    /** @var Store $store */
-    protected $store;
-
     /**
      * ProductService constructor.
      *
@@ -42,7 +38,8 @@ class ProductService
      */
     public function __construct(Store $store, array $product_data, Product $product = null)
     {
-        $this->store = $store;
+        parent::__construct($store);
+
         $this->product_data = $product_data;
         $this->variants_data = $this->product_data['variants'];
 
@@ -74,9 +71,10 @@ class ProductService
         try {
             DB::beginTransaction();
 
-            $this->fill($this->product_data, $attributes);
-
             $new_product = $this->product->exists;
+
+            $this->fillMap($this->product_data);
+            $this->product->fill($attributes);
             $this->product->save();
 
             foreach ($this->variants_data as $variant_data) {
@@ -107,7 +105,7 @@ class ProductService
 
             $this->product = null;
 
-            $trace = Util::exceptionArr($e);
+            $trace = $this->util()::exceptionArr($e);
 
             $this->msg('create', compact('trace'), 'emergency');
 
@@ -140,7 +138,7 @@ class ProductService
      * @param array $attributes
      * @return Product
      */
-    protected function fill(array $product_data, array $attributes = [])
+    protected function fillMap(array $product_data, array $attributes = [])
     {
         $mapped_data = $this->util()->mapData(
             $data = $product_data,
@@ -221,45 +219,14 @@ class ProductService
     }
 
     /**
-     * @return Store
-     */
-    public function getStore(): Store
-    {
-        return $this->store;
-    }
-
-    /**
-     * @param string $msg
-     * @param array $data
-     * @param string $level
-     * @return void
-     */
-    public function msg($msg = '', $data = [], $level = 'emergency')
-    {
-        $store = $this->getStore();
-
-        $parts = explode('\\', get_called_class());
-        $parts = array_slice($parts, 3);
-        $parts = array_map('\Illuminate\Support\Str::snake', $parts);
-        $parts[] = $store->myshopify_domain;
-        $parts[] = $msg;
-
-        $msg = implode(':', array_filter($parts));
-        $data += $store->compact()
-            + ['id' => optional($this->product)->getKey() ?: $this->product_data['id'] ?? null];
-
-        Log::channel(config('shopify.sync.log_channel'))
-            ->$level((string) $msg, (array) $data);
-    }
-
-    /**
      * @param array $attributes
      * @return Product
      * @throws Exception
      */
     public function update(array $attributes =  [])
     {
-        $this->fill($this->product_data, $attributes);
+        $this->fillMap($this->product_data);
+        $this->product->fill($attributes);
 
         try {
             DB::beginTransaction();
@@ -307,13 +274,5 @@ class ProductService
         }
 
         return $this->product;
-    }
-
-    /**
-     * @return Util
-     */
-    protected function util()
-    {
-        return app(config('shopify.util'));
     }
 }

@@ -1,5 +1,5 @@
 {
-    "name": "dan/laravel-shopify-app",
+    "name": "dan/laravel-shopify-sync",
     "description": "Laravel solution for Shopify apps",
     "license": "MIT",
     "keywords": ["laravel"],

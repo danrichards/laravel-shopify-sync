@@ -15,18 +15,10 @@ use Symfony\Component\Console\Output\OutputInterface;
  */
 class ImportProductsAndVariants extends AbstractCommand
 {
-    /**
-     * The name and signature of the console command.
-     *
-     * @var string $signature
-     */
+    /** @var string $signature */
     protected $signature = 'shopify:import:products {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_product_import_at_max=now}';
 
-    /**
-     * The console command description.
-     *
-     * @var string $description
-     */
+    /** @var string $description */
     protected $description = 'Verify and sync recent products.';
 
     /** @var int $chunk_size */

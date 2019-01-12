@@ -22,9 +22,6 @@ class CreateStoresTable extends Migration
 
         Schema::create('stores', function (Blueprint $table) {
             $table->increments('id');
-            $table->unsignedInteger('user_id');
-            $table->unsignedInteger('fulfillment_user_id');
-            $table->unsignedInteger('fulfillment_store_id');
 
             $table->string('store_primary_location_id', 19)->nullable();
             $table->string('name', 255);
@@ -72,7 +69,6 @@ class CreateStoresTable extends Migration
             $table->boolean('requires_extra_payments_agreement')->nullable();
             $table->boolean('password_enabled')->nullable();
             $table->text('enabled_presentment_currencies')->nullable();
-            $table->string('shop', 255);
             $table->boolean('taxes_included')->nullable();
             $table->boolean('tax_shipping')->nullable();
             $table->boolean('county_taxes')->nullable();
@@ -82,9 +78,10 @@ class CreateStoresTable extends Migration
 
             $table->unsignedInteger('order_count')->default(0);
             $table->unsignedInteger('product_count')->default(0);
+            $table->unsignedInteger('customer_count')->default(0);
 
             $table->string('token', 255)->nullable();
-            $table->text('scopes');
+            $table->text('scopes')->nullable();
             $table->text('webhooks')->nullable();
             $table->string('uninstall_code', 4)->nullable();
 
@@ -108,8 +105,8 @@ class CreateStoresTable extends Migration
             $table->index('email', 'stores_email_index');
             $table->index('domain', 'stores_domain_index');
             $table->index('myshopify_domain', 'stores_myshopify_domain_index');
-            $table->index('created_at', 'stores_created_at_index');
-            $table->index('deleted_at', 'stores_deleted_at_index');
+            $table->index('created_at', 'created_at_index');
+            $table->index('deleted_at', 'deleted_at_index');
         });
     }
 

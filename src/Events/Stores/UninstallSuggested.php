@@ -7,11 +7,8 @@ use Dan\Shopify\Laravel\Models\Store;
 /**
  * Class UninstallSuggested
  */
-class UninstallSuggested
+class UninstallSuggested extends AbstractStoreEvent
 {
-    /** @var Store $store */
-    protected $store;
-
     /** @var $status_code */
     protected $status_code;
 
@@ -23,17 +20,10 @@ class UninstallSuggested
      */
     public function __construct(Store $store, $status_code)
     {
-        $this->store = $store;
+        parent::__construct($store);
         $this->status_code = $status_code;
     }
 
-    /**
-     * @return Store
-     */
-    public function getStore(): Store
-    {
-        return $this->store;
-    }
 
     /**
      * @return mixed
