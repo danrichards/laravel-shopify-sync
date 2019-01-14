@@ -155,9 +155,8 @@ class Store extends Model implements HasShopifyClientInterface
      */
     public function customers()
     {
-        return $this->belongsToMany(Customer::class, 'orders',  'store_id', 'customer_id')
-            ->whereMorphedBy(get_class($this), 'store')
-            ->groupBy('customers.id');
+        return $this->hasMany(Customer::class, 'store_id')
+            ->whereMorphedBy(get_class($this), 'store');
     }
 
     /**
