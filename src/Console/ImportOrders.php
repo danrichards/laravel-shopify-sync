@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ImportOrders extends AbstractCommand
 {
     /** @var string $signature */
-    protected $signature = 'shopify:import:orders {--dryrun} {--now} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_order_import_at_max=now}';
+    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_order_import_at_max=now}';
 
     /** @var string $description */
     protected $description = 'Verify and sync orders.';
@@ -68,14 +68,6 @@ class ImportOrders extends AbstractCommand
             ->newQuery()
             ->select('stores.*')
             ->forInstalled()
-            ->where(function (Builder $query) use ($last_order_import_at_max, $table) {
-                $query
-                    ->where(function(Builder $q2) use ($table) {
-                        $q2->whereNull("{$table}.last_order_import_at")
-                            ->whereNotNull("{$table}.last_product_import_at");
-                    })
-                    ->orWhere("{$table}.last_product_import_at", '>', "{$table}.last_order_import_at");
-            })
             ->when($this->optionIds('store_ids'), function(Builder $query, $store_ids) use($table) {
                 $query->whereIn("{$table}.id", $store_ids);
             });
@@ -95,7 +87,13 @@ class ImportOrders extends AbstractCommand
             $this->throwConnectionException();
         }
 
-        $this->log($store);
+        if (empty($store->last_product_import_at)) {
+            $this->log('product_import_required', $store, 'warning');
+            return;
+        }
+
+        $verb = $this->option('connection') == 'sync' ? 'dispatched' : 'queued';
+        $this->log($verb, $store, 'info');
 
         $job = new ImportStore($store, $params, $connection, $dryrun);
 
@@ -105,17 +103,19 @@ class ImportOrders extends AbstractCommand
     }
 
     /**
+     * @param string $msg
      * @param $store
+     * @param string $level
+     * @param array $data
      */
-    protected function log($store): void
+    protected function log($msg, Store $store, $level = 'info', $data = []): void
     {
-        $verb = $this->option('now') ? 'dispatched' : 'queued';
-        $msg = "cmd:shopify:orders:sync:{$store->myshopify_domain}:$verb";
+        $msg = "console:import:orders:{$store->myshopify_domain}:$msg";
         Log::channel(config('shopify.sync.log_channel'))
-            ->info($msg, $store->compact());
+            ->$level($msg, $store->compact() + $data);
 
         if ($this->verbosity % OutputInterface::VERBOSITY_VERBOSE == 0) {
-            $this->info($msg);
+            $this->$level($msg);
         }
     }
 
