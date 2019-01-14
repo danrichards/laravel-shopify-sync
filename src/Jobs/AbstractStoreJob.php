@@ -4,6 +4,7 @@ namespace Dan\Shopify\Laravel\Jobs;
 
 use Cache;
 use Dan\Shopify\Laravel\Models\Store;
+use Dan\Shopify\Laravel\Support\Util;
 use Dan\Shopify\Shopify;
 use Log;
 

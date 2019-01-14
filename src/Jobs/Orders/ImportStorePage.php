@@ -11,7 +11,6 @@ use Dan\Shopify\Laravel\Support\Util;
 use DB;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
-use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Queue\MaxAttemptsExceededException;
 
 /**
@@ -58,7 +57,7 @@ class ImportStorePage extends AbstractStoreJob
      * @param string $connection
      * @param bool $dryrun
      */
-    public function __construct(Store $store, array $pages = [1], $params = [], $connection = 'now', $dryrun = false)
+    public function __construct(Store $store, array $pages = [1], $params = [], $connection = 'sync', $dryrun = false)
     {
         parent::__construct($store);
 
@@ -102,10 +101,11 @@ class ImportStorePage extends AbstractStoreJob
         $page = $this->page;
         $page_sleep = config('shopify.sync.sleep_between_page_requests');
         $connection = $this->connection;
-        $verb = $connection == 'now' ? 'dispatched' : 'queued';
+        $verb = $connection == 'sync' ? 'dispatched' : 'queued';
 
         try {
-            $ids_numbers = [];
+            $importing = [];
+            $ignoring = [];
 
             $this->msg('initiated', compact('page', 'params'), 'info');
 
@@ -133,7 +133,12 @@ class ImportStorePage extends AbstractStoreJob
                     continue;
                 }
 
-                $ids_numbers[$id] = $api_order['number'];
+                if (OrderService::qualify($store, $api_order)) {
+                    $importing[$id] = $api_order['number'];
+                } else {
+                    $ignoring[$id] = $api_order['number'];
+                    continue;
+                }
 
                 if ($this->dryrun) {
                     $this->msg("order:{$id}:dryrun", [], 'info');
@@ -146,14 +151,20 @@ class ImportStorePage extends AbstractStoreJob
 
                 $found++;
 
-                $connection != 'now'
-                    ? dispatch($job)->onConnection($connection)
-                    : dispatch_now($job);
+                $connection == 'sync'
+                    ? dispatch_now($job)
+                    : dispatch($job)->onConnection($connection);
             }
 
-            empty($ids_numbers)
-                ? $this->msg('no_orders_queued',  [], 'info')
-                : $this->msg('orders_queued', $ids_numbers, 'info');
+            if (empty($importing)) {
+                $this->msg('no_orders_queued',  [], 'info');
+            } else {
+                $this->msg('orders_queued', $importing, 'info');
+            }
+
+            if (! empty($ignoring)) {
+                $this->msg('orders_ignored', $ignoring, 'info');
+            }
 
             // Set last_order_import_at to newest order created_at timestamp.
             if (! empty($api_orders) && ($found || $this->page != $this->total)) {
@@ -219,9 +230,9 @@ class ImportStorePage extends AbstractStoreJob
                         $params = compact('created_at_min', 'limit') + $this->params,
                         $connection = $this->connection);
 
-                    $connection != 'now'
-                        ? dispatch($job)->onConnection($connection)
-                        : dispatch_now($job);
+                    $connection == 'sync'
+                        ? dispatch_now($job)
+                        : dispatch($job)->onConnection($connection);
                 }
                 break;
             default:

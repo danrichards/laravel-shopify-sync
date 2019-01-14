@@ -13,6 +13,7 @@ use Carbon\Carbon;
 use DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Support\Collection as BaseCollection;
 
 /**
  * Class OrderService
@@ -81,6 +82,12 @@ class OrderService extends AbstractService
     /** @var Collection $variants */
     protected $variants;
 
+    /** @var bool $imported */
+    protected $imported;
+
+    /** @var bool $updated */
+    protected $updated;
+
     /**
      * ShopifyOrderService constructor.
      *
@@ -92,36 +99,9 @@ class OrderService extends AbstractService
     {
         parent::__construct($store);
 
-        $this->order_data = $order_data;
-        $order_model = config('shopify.orders.model');
+        $this->init($store, $order_data, $order);
 
-        // SANITY CHECK: Command is often queued, check again if the order exists.
-        if (isset($order_data['id']) && empty($order)) {
-            if ($existing = $order_model::findByStoreOrderId($order_data['id'], $store)) {
-                $this->order = $order = $existing;
-            }
-        }
-
-        $this->order = $order ?: new $order_model;
-
-        if ($this->order->exists) {
-            $this->line_items = $order_data['line_items'] ?? [];
-            $this->order_items = $this->order->order_items;
-            $this->customer = $this->order->customer;
-        } else {
-            $this->line_items = $this->getQualifyingLineItems();
-            $this->order_items = collect();
-            $this->fillCustomer($this->order_data);
-        }
-
-        // Log test orders.
-        if (isset($order_data['test'])
-            && $order_data['test']
-            && ! empty($this->line_items)
-            && ! $this->order->exists)
-        {
-            $this->msg('test_order', [], 'info');
-        }
+        $this->logTestOrders($order_data);
     }
 
     /**
@@ -213,6 +193,8 @@ class OrderService extends AbstractService
 //            }
 
             DB::commit();
+
+            $this->imported = true;
         } catch (Exception $e) {
             DB::rollBack();
 
@@ -295,7 +277,7 @@ class OrderService extends AbstractService
     protected function fillOrderItem(OrderItem $oi, array $line_item, array $attributes = [])
     {
         $map = config('shopify.orders.items.map');
-        $model = $oi->exists ? $oi : config('shopify.customers.model');
+        $model = $this->imported ? $oi : config('shopify.customers.model');
         $mapped_data = $this->util()::mapData($line_item, $map, $model);
 
         $oi->fill($attributes
@@ -413,15 +395,22 @@ class OrderService extends AbstractService
     {
         $line_items = $this->order_data['line_items'] ?? [];
 
-        $ids = $this->getQualifiedVariants()->keys();
-
         return collect($line_items)
-            ->filter(function(array $line_item) use ($ids) {
-                return $ids->has($line_item['variant_id']);
-            })
-            ->filter(function(array $line_item) {
-                return $this->util()->qualifyOrderItemImport($line_item);
-            })
+            ->when($this->order && $this->imported,
+                function(BaseCollection $update) {
+                    return $update->filter(function(array $li) {
+                        $oi = $this->order->order_items->first(function(OrderItem $order_item) use ($li) {
+                            return $order_item->store_line_item_id = $li['id'];
+                        });
+
+                        return $this->util()::qualifyOrderItemUpdate($li, $oi, $oi->variant);
+                    });
+                },
+                function(BaseCollection $import) {
+                    return $import->filter(function(array $li) {
+                        return $this->util()::qualifyOrderItemImport($li, $lookup = null);
+                    });
+                })
             ->keyBy('id');
     }
 
@@ -455,8 +444,8 @@ class OrderService extends AbstractService
             return $this->variants;
         }
 
-        // The order exists, therefore the variants have already been qualified
-        if ($this->order->exists) {
+        // The has already been imported, the variants should already be in the db
+        if ($this->imported) {
             return $this->variants = $this->order->variants;
         }
 
@@ -466,10 +455,72 @@ class OrderService extends AbstractService
         $variant_model = config('shopify.products.variants.model');
 
         // Get them variants from the DB
-        return $this->variants = (new $variant_model)
+        $data = $this->variants = (new $variant_model)
             ->whereIn('store_variant_id', $ids)
             ->get()
             ->keyBy('store_variant_id');
+
+        return $data;
+    }
+
+    /**
+     * @param Store $store
+     * @param array $order_data
+     * @param Order|null $order
+     * @return $this
+     */
+    protected function init(Store $store, array $order_data = [], Order $order = null)
+    {
+        $this->order_data = $order_data;
+        $order_model = config('shopify.orders.model');
+
+        // SANITY CHECK: Command is often queued, check again if the order exists.
+        if (isset($order_data['id']) && empty($order)) {
+            if ($existing = $order_model::findByStoreOrderId($order_data['id'], $store)) {
+                $this->order = $order = $existing;
+            }
+        }
+
+        $this->order = $order ?: new $order_model;
+
+        if ($this->order->exists) {
+            $this->line_items = $order_data['line_items'] ?? [];
+            $this->order_items = $this->order->order_items;
+            $this->customer = $this->order->customer;
+            $this->imported = true;
+            $this->updated = false;
+        } else {
+            $this->line_items = $this->getQualifyingLineItems();
+            $this->order_items = collect();
+            $this->fillCustomer($this->order_data);
+            $this->imported = false;
+            $this->updated = false;
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return bool
+     */
+    public function isQualified()
+    {
+        return $this->order && $this->imported
+            ? $this->util()::qualifyOrderUpdate($this->order_data, $this->order)
+                && $this->getQualifyingLineItems()->count()
+            : $this->util()::qualifyOrderImport($this->order_data)
+                && $this->getQualifyingLineItems()->count();
+    }
+
+    /**
+     * @param Store $store
+     * @param array $order_data
+     * @param Order|null $order
+     * @return bool
+     */
+    public static function qualify(Store $store, array $order_data, Order $order = null)
+    {
+        return (new static($store, $order_data, $order))->isQualified();
     }
 
     /**
@@ -497,6 +548,20 @@ class OrderService extends AbstractService
                                 : $line_item_quantity;
                         }, 0);
             }, 0);
+    }
+
+    /**
+     * @param array $order_data
+     */
+    protected function logTestOrders(array $order_data): void
+    {
+        if (config('shopify.orders.log_tests')
+            && isset($order_data['test'])
+            && $order_data['test']
+            && ! empty($this->line_items)
+            && ! $this->order->exists) {
+            $this->msg('test_order', $order_data, 'info');
+        }
     }
 
 //    /**
@@ -657,5 +722,4 @@ class OrderService extends AbstractService
 //
 //        return $this;
 //    }
-
 }

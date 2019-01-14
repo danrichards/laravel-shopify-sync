@@ -4,6 +4,7 @@ namespace Dan\Shopify\Laravel\Models;
 
 use Dan\Shopify\Models\Product as ShopifyProduct;
 use Dan\Shopify\Models\Variant as ShopifyVariant;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use More\Laravel\Model;
@@ -166,10 +167,10 @@ class Variant extends Model
     /**
      * @param int $store_product_id
      * @param int $store_variant_id
-     * @param Store $store
+     * @param Store|null $store
      * @return Variant|null
      */
-    public static function findByStoreProductIdVariantId($store_product_id, $store_variant_id, Store $store)
+    public static function findByStoreProductIdVariantId($store_product_id, $store_variant_id, Store $store = null)
     {
         return static::select(['variants.*'])
             ->join('products', 'products.id', '=', 'variants.product_id')
@@ -181,19 +182,21 @@ class Variant extends Model
 
     /**
      * @param int $store_variant_id
-     * @param  $store
+     * @param Store|null $store
      * @param bool $with_trashed
      * @return Variant|null
      */
-    public static function findByStoreVariantId($store_variant_id, Store $store, $with_trashed = false)
+    public static function findByStoreVariantId($store_variant_id, Store $store = null, $with_trashed = false)
     {
-        $query = static::select(['variants.*'])
+        return static::select(['variants.*'])
             ->join('products', 'products.id', '=', 'variants.product_id')
-            ->whereMorph($store, 'store')
-            ->where('variants.store_variant_id', $store_variant_id);
-
-        return $with_trashed
-            ? $query->withTrashed()->first()
-            : $query->first();
+            ->where('variants.store_variant_id', $store_variant_id)
+            ->when($store, function(Builder $q, $s) {
+                $q->whereMorph($s, 'store');
+            })
+            ->when($with_trashed, function(Builder $q) {
+                return $q->withTrashed()->first();
+            })
+            ->first();
     }
 }

@@ -18,11 +18,20 @@ class Util
 {
     /**
      * @param array $line_item_data
+     * @param Variant $variant
      * @return bool
      */
-    public static function qualifyOrderItemImport(array $line_item_data)
+    public static function qualifyOrderItemImport(array $line_item_data, Variant $variant = null)
     {
-        return ! empty($line_item_data['product_id']) && ! empty($line_item_data['product_id']);
+        $variant_model = config('shopify.products.variants.model');
+        $variant = $variant ?: $variant_model::findByStoreVariantId(
+            $variant_id = $line_item_data['variant_id'],
+            $search_with_null_store = null,
+            $with_trashed = true);
+
+        return ! empty($line_item_data['product_id'])
+            && ! empty($line_item_data['variant_id'])
+            && optional($variant)->exists;
     }
 
     /**
@@ -45,6 +54,8 @@ class Util
 
     /**
      * @param array $variant_data
+     * @param Product|null $product
+     * @param Variant|null $variant
      * @return bool
      */
     public static function qualifyVariantImport(array $variant_data)
@@ -54,42 +65,44 @@ class Util
 
     /**
      * @param array $line_item_data
-     * @param OrderItem|null $order_item
+     * @param OrderItem $order_item
+     * @param Variant $variant
      * @return bool
      */
-    public static function qualifyOrderItemUpdate(array $line_item_data, OrderItem $order_item = null)
+    public static function qualifyOrderItemUpdate(array $line_item_data, OrderItem $order_item, Variant $variant)
     {
-        return ! empty($line_item_data['product_id']) && ! empty($line_item_data['product_id']);
+        return ! empty($line_item_data['product_id'])
+            && ! empty($line_item_data['variant_id']);
     }
 
     /**
      * @param array $order_data
-     * @param Order|null $order
+     * @param Order $order
      * @return bool
      */
-    public static function qualifyOrderUpdate(array $order_data, Order $order = null)
+    public static function qualifyOrderUpdate(array $order_data, Order $order)
     {
-        return true;
+        return $order_data['id'] == $order->store_order_id;
     }
 
     /**
      * @param array $product_data
-     * @param Product|null $product
+     * @param Product $product
      * @return bool
      */
-    public static function qualifyProductUpdate(array $product_data, Product $product = null)
+    public static function qualifyProductUpdate(array $product_data, Product $product)
     {
-        return true;
+        return $product_data['id'] == $product->store_product_id;
     }
 
     /**
      * @param array $variant_data
-     * @param Variant|null $variant
+     * @param Product $product
      * @return bool
      */
-    public static function qualifyVariantUpdate(array $variant_data, Variant $variant = null)
+    public static function qualifyVariantUpdate(array $variant_data, Product $product, Variant $variant)
     {
-        return true;
+        return $product->variants->contains('store_variant_id', $variant_data['id']);
     }
 
     /**
