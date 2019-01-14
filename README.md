@@ -1,6 +1,6 @@
-# Laravel Shopify App
+# Laravel Shopify Sync
 
-A Laravel Shopify App Starting Point
+A Laravel-Shopify App / Starting Point (with a focus on data synchonization)
 
 ## Highlights
 
@@ -12,7 +12,7 @@ Wait...
 
 ## Composer
 
-    $ composer require dan/laravel-shopify-app dev-master
+    $ composer require dan/laravel-shopify-sync dev-master
 
 ## Contributors
 
