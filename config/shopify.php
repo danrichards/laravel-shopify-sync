@@ -40,8 +40,8 @@ return [
     'customers' => [
         'model' => \Dan\Shopify\Laravel\Models\Customer::class,
         'map_from_orders' => [
-            /* REQUIRED */ 'customer.store_customer_id' => 'store_customer_id',
-            /* REQUIRED */ 'customer.store_last_order_id' => 'store_last_order_id',
+            /* REQUIRED */ 'customer.id' => 'store_customer_id',
+            /* REQUIRED */ 'customer.last_order_id' => 'store_last_order_id',
             'customer.admin_graphql_api_id' => 'admin_graphql_api_id',
             /* REQUIRED */ 'customer.email' => 'email',
             /* REQUIRED */ 'customer.first_name' => 'first_name',
@@ -84,6 +84,7 @@ return [
     |
     */
     'orders' => [
+        'log_tests' => env('SHOPIFY_ORDERS_LOG_TESTS', 1),
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
         'map' => [
             /* REQUIRED */ 'id' => 'store_order_id',
