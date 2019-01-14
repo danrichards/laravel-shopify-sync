@@ -23,13 +23,12 @@ class CreateCustomersTable extends Migration
         Schema::create('customers', function (Blueprint $table) {
             $table->increments('id');
 
-            $table->unsignedInteger('last_order_id')->nullable();
-
             $table->string('store_type')->default(addslashes(\Dan\Shopify\Laravel\Models\Store::class));
             $table->unsignedInteger('store_id')->nullable();
+            $table->unsignedInteger('last_order_id')->nullable();
 
-            $table->string('store_customer_id', 19)->nullable();
-            $table->string('store_last_order_id', 19)->nullable();
+            $table->unsignedBigInteger('store_customer_id')->nullable();
+            $table->unsignedBigInteger('store_last_order_id')->nullable();
             $table->string('admin_graphql_api_id', 64)->nullable();
 
             $table->string('email', 255);

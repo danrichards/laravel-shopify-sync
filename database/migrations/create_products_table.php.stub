@@ -25,9 +25,10 @@ class CreateProductsTable extends Migration
 
             $table->string('store_type', 255)->default(\App\Models\Store::class);
             $table->unsignedInteger('store_id');
-            $table->string('store_product_id', 19);
 
+            $table->unsignedBigInteger('store_product_id');
             $table->string('admin_graphql_api_id', 64)->nullable();
+
             $table->string('title', 255)->nullable();
             $table->text('body_html')->nullable();
             $table->string('vendor', 128)->nullable();

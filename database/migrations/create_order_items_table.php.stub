@@ -27,10 +27,10 @@ class CreateOrderItemsTable extends Migration
             $table->unsignedInteger('product_id');
             $table->unsignedInteger('variant_id');
 
-            $table->string('store_line_item_id', 32);
-            $table->string('store_product_id', 32)->nullable();
-            $table->string('store_variant_id', 32)->nullable();
-            $table->string('store_fulfillment_id', 19)->nullable();
+            $table->unsignedBigInteger('store_line_item_id');
+            $table->unsignedBigInteger('store_product_id')->nullable();
+            $table->unsignedBigInteger('store_variant_id')->nullable();
+            $table->unsignedBigInteger('store_fulfillment_id')->nullable();
             $table->string('admin_graphql_api_id', 64)->nullable();
 
             $table->string('name', 255)->nullable();

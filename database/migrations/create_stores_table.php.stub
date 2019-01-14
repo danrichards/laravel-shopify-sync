@@ -23,7 +23,7 @@ class CreateStoresTable extends Migration
         Schema::create('stores', function (Blueprint $table) {
             $table->increments('id');
 
-            $table->string('store_primary_location_id', 19)->nullable();
+            $table->unsignedBigInteger('store_primary_location_id')->nullable();
             $table->string('name', 255);
             $table->string('shop_owner', 255);
             $table->string('email', 255);
@@ -101,10 +101,9 @@ class CreateStoresTable extends Migration
             $table->index('user_id', 'stores_user_id_index');
             $table->index('fulfillment_user_id', 'stores_fulfillment_user_id_index');
             $table->index('fulfillment_store_id', 'stores_fulfillment_store_id_unique');
-            $table->unique('shop', 'stores_shop_unique');
             $table->index('email', 'stores_email_index');
             $table->index('domain', 'stores_domain_index');
-            $table->index('myshopify_domain', 'stores_myshopify_domain_index');
+            $table->unique('myshopify_domain', 'stores_myshopify_domain_unique');
             $table->index('created_at', 'created_at_index');
             $table->index('deleted_at', 'deleted_at_index');
         });

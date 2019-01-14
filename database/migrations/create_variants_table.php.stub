@@ -25,9 +25,9 @@ class CreateVariantsTable extends Migration
 
             $table->unsignedInteger('product_id');
 
-            $table->string('store_variant_id', 19);
-            $table->string('store_product_id', 19);
-            $table->string('store_image_id', 255)->nullable();
+            $table->unsignedBigInteger('store_variant_id');
+            $table->unsignedBigInteger('store_product_id');
+            $table->unsignedBigInteger('store_image_id')->nullable();
 
             $table->string('sku', 255)->nullable();
             $table->string('barcode', 255)->nullable();

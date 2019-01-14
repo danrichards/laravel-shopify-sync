@@ -23,17 +23,18 @@ class CreateOrdersTable extends Migration
         Schema::create('orders', function (Blueprint $table) {
             $table->increments('id');
 
-            $table->unsignedInteger('customer_id')->unsigned();
+            $table->unsignedInteger('customer_id');
 
             $table->string('store_type')->default(addslashes(config('shopify.stores.model')));
             $table->integer('store_id');
 
-            $table->string('store_order_id', 19);
+            $table->unsignedBigInteger('store_order_id');
+            $table->unsignedBigInteger('store_user_id')->nullable();
+            $table->unsignedBigInteger('store_app_id')->nullable();
+            $table->string('admin_graphql_api_id', 64)->nullable();
+
             $table->string('number', 19)->nullable();
             $table->string('name', 20)->nullable();
-            $table->string('admin_graphql_api_id', 64)->nullable();
-            $table->string('store_user_id', 19)->nullable();
-            $table->string('store_app_id', 19)->nullable();
 
             $table->boolean('test')->default(false);
 
