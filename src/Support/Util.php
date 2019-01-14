@@ -98,6 +98,7 @@ class Util
     /**
      * @param array $variant_data
      * @param Product $product
+     * @param Variant $variant
      * @return bool
      */
     public static function qualifyVariantUpdate(array $variant_data, Product $product, Variant $variant)
