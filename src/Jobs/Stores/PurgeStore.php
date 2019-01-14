@@ -3,6 +3,8 @@
 namespace Dan\Shopify\Laravel\Jobs\Stores;
 
 use Dan\Shopify\Laravel\Jobs\AbstractStoreJob;
+use Dan\Shopify\Laravel\Models\Order;
+use Dan\Shopify\Laravel\Models\Product;
 use Dan\Shopify\Laravel\Models\Store;
 use Dan\Shopify\Laravel\Support\Util;
 use Exception;
@@ -38,21 +40,35 @@ class PurgeStore extends AbstractStoreJob
             $store = $this->getStore();
 
             if (in_array('customers', $this->entities)) {
-                $customer_model = config('shopify.customers.model');
-                $customer_model::forStore($store)->withTrashed()->forceDelete();
-                $this->resetTimestamp('customers');
+                $store->customers()->withTrashed()->forceDelete();
+                $this->resetTimestamp('customer');
             }
 
             if (in_array('orders', $this->entities)) {
-                $order_model = config('shopify.orders.model');
-                $order_model::forStore($store)->withTrashed()->forceDelete();
-                $this->resetTimestamp('orders');
+                $store->orders()->withTrashed()
+                    ->chunk(100, function($orders) {
+                        /** @var Order $order */
+                        foreach ($orders as $order) {
+                            $order->order_items()->withTrashed()->forceDelete();
+                        }
+                    });
+
+                $store->orders()->withTrashed()->forceDelete();
+                $this->resetTimestamp('order');
             }
 
             if (in_array('products', $this->entities)) {
-                $product_model = config('shopify.products.model');
-                $product_model::forStore($store)->withTrashed()->forceDelete();
-                $this->resetTimestamp('products');
+                $store->products()->withTrashed()
+                    ->chunk(100, function($products) {
+                        /** @var Product $product */
+                        foreach ($products as $product) {
+                            $product->variants()->withTrashed()->forceDelete();
+                        }
+                    });
+                
+                $store->products()->withTrashed()->forceDelete();
+                
+                $this->resetTimestamp('product');
             }
 
             if (in_array('store', $this->entities)) {
