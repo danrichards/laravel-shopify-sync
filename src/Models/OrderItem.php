@@ -50,9 +50,11 @@ class OrderItem extends Model
     protected $casts = [
         'discount_allocations' => 'array',
         'origin_location' => 'array',
+        'presentment_money' => 'array',
         'price_set' => 'array',
         'properties' => 'array',
         'tax_lines' => 'array',
+        'total_discount_set' => 'array',
         'total_price_set' => 'array',
     ];
 
