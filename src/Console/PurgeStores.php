@@ -47,7 +47,7 @@ class PurgeStores extends AbstractCommand
         return $store_model
             ->forInstalled()
             ->when($this->optionIds('store_ids'), function (Builder $q, $store_ids) {
-                $q->whereIn('shopify_stores.id', $store_ids);
+                $q->whereIn('stores.id', $store_ids);
             });
     }
 

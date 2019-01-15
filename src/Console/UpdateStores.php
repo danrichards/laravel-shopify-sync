@@ -82,7 +82,7 @@ class UpdateStores extends AbstractCommand
         return $store_model
             ->forInstalled()
             ->when($this->optionIds('store_ids'), function (Builder $q, $store_ids) {
-                $q->whereIn('shopify_stores.id', $store_ids);
+                $q->whereIn('stores.id', $store_ids);
             })
             ->when($this->option('updated_at_min'), function(Builder $q, $t) {
                 $updated_at_min = (new Carbon($t))->format("Y-m-d H:i:s");

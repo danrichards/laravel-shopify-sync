@@ -124,7 +124,6 @@ class ImportProductsAndVariants extends AbstractCommand
     }
 
     /**
-     * @param string $connection
      * @throws Exception
      */
     protected function throwConnectionError()
