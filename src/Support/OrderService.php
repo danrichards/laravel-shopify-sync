@@ -20,67 +20,49 @@ use Illuminate\Support\Collection as BaseCollection;
  */
 class OrderService extends AbstractService
 {
-    /**
-     * After order creation, these fields may no longer be updated.
-     *
-     * @var array $order_never_updates */
-    public static $order_never_updates = [
-        'user_id',
-        'store_order_id',
-        'order_number',
-        'checkout_id',
-        'checkout_token',
-        'cancelled_at',     // Manual logic below.
-    ];
-
-    /**
-     * After order creation, these item fields may no longer be updated.
-     *
-     * @var array $order_item_never_updates */
-    public static $order_item_never_updates = [
-        'store_line_item_id',
-        'store_variant_id',
-        'store_product_id',
-        'shopify_sku',
-        'quantity',
-        'properties',
-    ];
-
-    /** @var array $shipping_fields */
-    public static $shipping_fields = [
-        'first_name',
-        'last_name',
-        'phone',
-        'company',
-        'address1',
-        'address2',
-        'city',
-        'province',
-        'province_code',
-        'zip',
-        'country',
-        'country_code',
-        'longitude',
-        'latitude',
-    ];
+//    /**
+//     * After order creation, these fields may no longer be updated.
+//     *
+//     * @var array $order_never_updates */
+//    public static $order_never_updates = [
+//        'user_id',
+//        'store_order_id',
+//        'order_number',
+//        'checkout_id',
+//        'checkout_token',
+//        'cancelled_at',     // Manual logic below.
+//    ];
+//
+//    /**
+//     * After order creation, these item fields may no longer be updated.
+//     *
+//     * @var array $order_item_never_updates */
+//    public static $order_item_never_updates = [
+//        'store_line_item_id',
+//        'store_variant_id',
+//        'store_product_id',
+//        'shopify_sku',
+//        'quantity',
+//        'properties',
+//    ];
 
     /** @var Customer $customer */
     protected $customer;
 
-    /** @var array $line_items */
-    protected $line_items = [];
-
     /** @var Order|null $order */
-    protected $order = null;
+    protected $order;
 
     /** @var array $order_data */
     protected $order_data = [];
 
     /** @var Collection|null $order_items */
-    protected $order_items = null;
+    protected $order_items;
 
-    /** @var Collection $variants */
-    protected $variants;
+    /** @var Collection|null $qualified_line_items_data */
+    protected $qualified_line_items_data = [];
+
+    /** @var Collection|null $qualified_variants */
+    protected $qualified_variants;
 
     /** @var bool $imported */
     protected $imported;
@@ -167,26 +149,29 @@ class OrderService extends AbstractService
             $this->order->fill($attributes);
             $this->order->save();
 
-            $item_quantities = [];
-
-            // Handle any line items that have been refunded.
-            foreach ($this->line_items as $line_item) {
-                $item_quantities[$line_item['id']] = $line_item['quantity'];
-
-                $order_item = $this->fillNewOrderItem($line_item);
-                $order_item->order()->associate($this->order);
-                $order_item->save();
-
-                $this->order_items->push($order_item);
+            foreach ($this->getQualifiedOrderItems() as $oi) {
+                $oi->save();
+                $this->order_items[$oi->store_line_item_id] = $oi;
             }
 
-            $refunded_quantity = collect($this->line_items)
-                ->sum(function($item) {
-                    return static::refundedQuantityForLineItem($this->order_data, $item['id']);
-                });
-
-            \Log::debug('refunds', compact('refunded_quantity')
-                + ['refunds' => array_get($this->order_data, 'refunds')]);
+//            // Handle any line items that have been refunded.
+//            foreach ($this->getQualifiedLineItemsData() as $line_item) {
+//                $item_quantities[$line_item['id']] = $line_item['quantity'];
+//
+//                $order_item = $this->fillNewOrderItem($line_item);
+//                $order_item->order()->associate($this->order);
+//                $order_item->save();
+//
+//                $this->order_items->push($order_item);
+//            }
+//
+//            $refunded_quantity = $this->getQualifiedLineItemsData()
+//                ->sum(function($item) {
+//                    return static::refundedQuantityForLineItem($this->order_data, $item['id']);
+//                });
+//
+//            \Log::debug('refunds', compact('refunded_quantity')
+//                + ['refunds' => array_get($this->order_data, 'refunds')]);
             // If the order is already completely refunded, just cancel it.
 //            if ($refunded_quantity >= array_sum($item_quantities)) {
 //                $this->cancel(new Carbon());
@@ -335,14 +320,6 @@ class OrderService extends AbstractService
     }
 
     /**
-     * @return array
-     */
-    public function getLineItems(): array
-    {
-        return $this->line_items;
-    }
-
-    /**
      * @return Order|null
      */
     public function getOrder(): ?Order
@@ -355,7 +332,11 @@ class OrderService extends AbstractService
      */
     public function getOrderItems()
     {
-        return $this->order_items;
+        if (! is_null($this->order_items)) {
+            return $this->order_items;
+        }
+
+        return $this->order_items = $this->order->order_items->keyBy('store_line_item_id');
     }
 
 //    /**
@@ -385,51 +366,46 @@ class OrderService extends AbstractService
 //    }
 
     /**
+     * @return BaseCollection
+     */
+    protected function getQualifiedOrderItems()
+    {
+        // Handle any line items that have been refunded.
+        return $this->getQualifiedLineItemsData()
+            ->map(function(array $li) {
+                if ($oi = $this->getOrderItems()->get($li['id'])) {
+                    return $this->fillOrderItem($oi, $li);
+                }
+
+                $order_item = $this->fillNewOrderItem($li);
+                $order_item->order()->associate($this->order);
+
+                return $order_item;
+            });
+    }
+
+    /**
      * Fetch line items from order_data that have variant ids in the DB.
      *
      * Return collection key'd by line item id.
      *
      * @return \Illuminate\Support\Collection
      */
-    protected function getQualifyingLineItems()
+    protected function getQualifiedLineItemsData()
     {
+        if ($this->qualified_line_items_data) {
+            return $this->qualified_line_items_data;
+        }
+
         $line_items = $this->order_data['line_items'] ?? [];
 
-        return collect($line_items)
-            ->when($this->order && $this->imported,
-                function(BaseCollection $update) {
-                    return $update->filter(function(array $li) {
-                        $oi = $this->order->order_items->first(function(OrderItem $order_item) use ($li) {
-                            return $order_item->store_line_item_id = $li['id'];
-                        });
+        return $this->qualified_line_items_data = collect($line_items)
+            ->filter(function(array $li) {
+                if ($oi = $this->getOrderItems()->get($li['id'])) {
+                    return $this->util()::qualifyOrderItemUpdate($li, $oi, $oi->variant);
+                }
 
-                        return $this->util()::qualifyOrderItemUpdate($li, $oi, $oi->variant);
-                    });
-                },
-                function(BaseCollection $import) {
-                    return $import->filter(function(array $li) {
-                        return $this->util()::qualifyOrderItemImport($li, $lookup = null);
-                    });
-                })
-            ->keyBy('id');
-    }
-
-    /**
-     * Fetch line items from order_data with no variant id in the DB.
-     *
-     * Return collection key'd by line item id.
-     *
-     * @return \Illuminate\Support\Collection
-     */
-    public function getUnqualifiedLineItems()
-    {
-        $line_items = $this->order_data['line_items'] ?? [];
-
-        $ids = $this->getQualifiedVariants()->keys();
-
-        return collect($line_items)
-            ->filter(function(array $line_item) use ($ids) {
-                return ! $ids->has($line_item['variant_id']);
+                return $this->util()::qualifyOrderItemImport($li, $lookup = null);
             })
             ->keyBy('id');
     }
@@ -440,27 +416,46 @@ class OrderService extends AbstractService
     public function getQualifiedVariants()
     {
         // The variants are already cached, send them back
-        if (! is_null($this->variants)) {
-            return $this->variants;
+        if (! is_null($this->qualified_variants)) {
+            return $this->qualified_variants;
         }
 
-        // The has already been imported, the variants should already be in the db
-        if ($this->imported) {
-            return $this->variants = $this->order->variants;
-        }
-
-        $line_items = $this->order_data['line_items'] ?? [];
-        $ids = array_filter(array_pluck($line_items, 'variant_id'));
+        $ids = $this->getQualifiedLineItemsData()
+            ->pluck('id', 'variant_id')
+            ->keys()
+            ->filter()
+            ->all();
 
         $variant_model = config('shopify.products.variants.model');
 
         // Get them variants from the DB
-        $data = $this->variants = (new $variant_model)
+        $data = $this->qualified_variants = (new $variant_model)
+            ->newQuery()
             ->whereIn('store_variant_id', $ids)
             ->get()
             ->keyBy('store_variant_id');
 
         return $data;
+    }
+
+    /**
+     * Fetch line items from order_data with no variant id in the DB.
+     *
+     * Return collection key'd by line item id.
+     *
+     * @return \Illuminate\Support\Collection
+     */
+    public function getUnqualifiedLineItemsData()
+    {
+        $line_items = $this->order_data['line_items'] ?? [];
+
+        $ids = $this->getQualifiedVariants()->keys();
+
+        return collect($line_items)
+            ->filter(function(array $line_item) use ($ids) {
+                return ! $ids->has($line_item['variant_id']);
+            })
+            ->keyBy('id');
     }
 
     /**
@@ -483,18 +478,17 @@ class OrderService extends AbstractService
 
         $this->order = $order ?: new $order_model;
 
+        $this->imported = $this->order->exists;
+        $this->updated = false;
+
         if ($this->order->exists) {
-            $this->line_items = $order_data['line_items'] ?? [];
+            $this->qualified_line_items_data = $this->getQualifiedLineItemsData();
             $this->order_items = $this->order->order_items;
             $this->customer = $this->order->customer;
-            $this->imported = true;
-            $this->updated = false;
         } else {
-            $this->line_items = $this->getQualifyingLineItems();
+            $this->qualified_line_items_data = $this->getQualifiedLineItemsData();
             $this->order_items = collect();
-            $this->fillCustomer($this->order_data);
-            $this->imported = false;
-            $this->updated = false;
+            $this->customer = $this->fillCustomer($this->order_data);
         }
 
         return $this;
@@ -507,9 +501,9 @@ class OrderService extends AbstractService
     {
         return $this->order && $this->imported
             ? $this->util()::qualifyOrderUpdate($this->order_data, $this->order)
-                && $this->getQualifyingLineItems()->count()
+                && $this->getQualifiedLineItemsData()->count()
             : $this->util()::qualifyOrderImport($this->order_data)
-                && $this->getQualifyingLineItems()->count();
+                && $this->getQualifiedLineItemsData()->count();
     }
 
     /**
@@ -558,7 +552,7 @@ class OrderService extends AbstractService
         if (config('shopify.orders.log_tests')
             && isset($order_data['test'])
             && $order_data['test']
-            && ! empty($this->line_items)
+            && ! empty($this->qualified_line_items_data)
             && ! $this->order->exists) {
             $this->msg('test_order', $order_data, 'info');
         }
