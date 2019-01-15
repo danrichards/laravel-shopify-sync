@@ -79,7 +79,7 @@ class ImportStore extends AbstractStoreJob
             // Fire job to sync the first page.
             $connection == 'sync'
                 ? dispatch_now($page_job)
-                : dispatch($page_job)->onQueue($connection);
+                : dispatch($page_job)->onConnection($connection);
 
             $verb = $connection == 'sync' ? 'first_page_dispatched' : 'first_page_queued';
             $this->msg($verb, [], 'info');
