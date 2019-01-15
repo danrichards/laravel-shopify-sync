@@ -48,7 +48,7 @@ class CreateVariantsTable extends Migration
             $table->integer('inventory_quantity')->nullable();
             $table->integer('old_inventory_quantity')->nullable();
             $table->string('inventory_policy')->nullable();
-            $table->boolean('inventory_management')->nullable();
+            $table->string('inventory_management', 255)->nullable();
 
             $table->timestamp('store_created_at')->nullable();
             $table->timestamp('store_updated_at')->nullable();
