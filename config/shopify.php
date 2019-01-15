@@ -260,7 +260,7 @@ return [
             /* REQUIRED */ 'handle' => 'handle',
             /* REQUIRED */ 'template_suffix' => 'template_suffix',
             /* REQUIRED */ 'published_scope' => 'published_scope',
-            //'tags' => 'tags',
+            'tags' => 'tags',
             /* REQUIRED */ 'options' => 'options',
             /* REQUIRED */ 'images' => 'images',
             /* REQUIRED */ 'image' => 'image',
