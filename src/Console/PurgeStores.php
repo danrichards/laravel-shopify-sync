@@ -83,7 +83,7 @@ class PurgeStores extends AbstractCommand
             : dispatch(new PurgeStore($store, $entities))
                 ->onConnection($connection);
 
-        $this->info("Purge for Store({$store->getKey()}): {$store->myshopify_domain}, has completed.");
+        $this->info("shopify:purge:stores:{$store->myshopify_domain}({$store->getKey()}):completed");
 
         return $store;
     }

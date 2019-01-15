@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ImportOrders extends AbstractCommand
 {
     /** @var string $signature */
-    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any} {--last_order_import_at_max=now}';
+    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any}';
 
     /** @var string $description */
     protected $description = 'Verify and sync orders.';
@@ -57,8 +57,6 @@ class ImportOrders extends AbstractCommand
      */
     protected function getQuery()
     {
-        $last_order_import_at_max = new Carbon($this->option('last_order_import_at_max'));
-
         $store_model = config('shopify.stores.model', Store::class);
         /** @var \Dan\Shopify\Laravel\Models\Store $store_model */
         $store_model = new $store_model;
@@ -110,7 +108,7 @@ class ImportOrders extends AbstractCommand
      */
     protected function log($msg, Store $store, $level = 'info', $data = []): void
     {
-        $msg = "console:import:orders:{$store->myshopify_domain}:$msg";
+        $msg = "console:import:orders:{$store->myshopify_domain}({$store->getKey()}):$msg";
         Log::channel(config('shopify.sync.log_channel'))
             ->$level($msg, $store->compact() + $data);
 

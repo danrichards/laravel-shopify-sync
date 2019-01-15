@@ -146,7 +146,7 @@ class ImportProductsAndVariants extends AbstractCommand
     {
         $verb = $connection == 'sync' ? 'dispatched' : 'queued';
 
-        $msg = "console:shopify:products:import:{$store->myshopify_domain}:$verb";
+        $msg = "console:shopify:products:import:{$store->myshopify_domain}({$store->getKey()}):$verb";
         Log::channel(config('shopify.sync.log_channel'))
             ->info($msg, $store->compact());
 

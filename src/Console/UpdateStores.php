@@ -28,6 +28,11 @@ class UpdateStores extends AbstractCommand
      */
     public function handle()
     {
+        if (config('shopify.sync.enabled', true) != true) {
+            $this->error('Sync has been disabled. Please re-enable in your `shopify` configuration.');
+            return;
+        }
+
         $connection = $this->option('connection');
         $counts = $this->getCounts();
 
@@ -65,7 +70,7 @@ class UpdateStores extends AbstractCommand
             : dispatch(new UpdateStore($store, $counts))
                 ->onConnection($connection);
 
-        $this->info("Update for Store({$store->getKey()}): {$store->myshopify_domain}, has completed.");
+        $this->info("console:shopify:update:stores:{$store->myshopify_domain}({$store->getKey()}):completed");
 
         return $store;
     }
