@@ -17,6 +17,18 @@ use More\Laravel\Model;
 class Util
 {
     /**
+     * Truncate body_html data if ridiculously long.
+     *
+     * @param array $data
+     * @param Model|null $obj
+     * @return bool|string
+     */
+    public static function fillProductBodyHtml(array $data, $obj = null)
+    {
+        return substr($data['body_html'] ?? '', 0, 65000);
+    }
+
+    /**
      * @param array $line_item_data
      * @param Variant $variant
      * @return bool
@@ -123,7 +135,6 @@ class Util
     {
         return static::dictionaryMergeNameValues([], $name_values);
     }
-
 
     /**
      * @param array $data
