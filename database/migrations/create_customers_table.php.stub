@@ -67,11 +67,11 @@ class CreateCustomersTable extends Migration
             $table->nullableTimestamps();
             $table->softDeletes();
 
+            $table->unique('store_customer_id', 'store_customer_id_unique');
             $table->index('last_order_id', 'customers_last_order_id_index');
             $table->index('store_last_order_id', 'customers_store_last_order_id_index');
             $table->index('accepts_marketing', 'customers_accepts_marketing_index');
-            $table->index(['store_type', 'store_id'], 'customer_store_type_store_id_index');
-            $table->unique(['store_type', 'store_id', 'email'], 'customers_email_unique');
+            $table->index(['store_type', 'store_id', 'email'], 'customer_store_type_store_id_email_index');
             $table->index('store_created_at', 'customers_created_at_index');
             $table->index('deleted_at', 'customers_deleted_at_index');
         });

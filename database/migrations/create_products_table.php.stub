@@ -55,7 +55,8 @@ class CreateProductsTable extends Migration
             // ---
 
             $table->index(['store_type', 'store_id'], 'products_store_type_store_id_index');
-            $table->index('store_product_id', 'products_store_product_id_index');
+            $table->unique('store_product_id', 'products_store_product_id_unique');
+            $table->unique(['store_type', 'store_id', 'store_product_id'], 'product_store_unique');
             $table->index('admin_graphql_api_id', 'products_admin_graphql_api_id_index');
             $table->index('vendor', 'products_vendor_index');
             $table->index('product_type', 'products_product_type_index');

@@ -58,7 +58,7 @@ class CreateVariantsTable extends Migration
             $table->softDeletes();
 
             $table->index('product_id', 'variants_product_id_index');
-            $table->index('store_variant_id', 'variants_store_variant_id_index');
+            $table->unique('store_variant_id', 'variants_store_variant_id_unique');
             $table->index('store_product_id', 'variants_store_product_id_index');
             $table->index('store_created_at', 'variants_store_created_at_index');
             $table->index('deleted_at', 'variants_store_deleted_at_index');
