@@ -21,7 +21,7 @@ class Util
      * @param Variant $variant
      * @return bool
      */
-    public static function qualifyOrderItemImport(array $line_item_data, Variant $variant = null)
+    public static function filterOrderItemImport(array $line_item_data, Variant $variant = null)
     {
         $variant_model = config('shopify.products.variants.model');
         $variant = $variant ?: $variant_model::findByStoreVariantId(
@@ -38,7 +38,7 @@ class Util
      * @param array $order_data
      * @return bool
      */
-    public static function qualifyOrderImport(array $order_data)
+    public static function filterOrderImport(array $order_data)
     {
         return true;
     }
@@ -47,7 +47,7 @@ class Util
      * @param array $product_data
      * @return bool
      */
-    public static function qualifyProductImport(array $product_data)
+    public static function filterProductImport(array $product_data)
     {
         return true;
     }
@@ -58,7 +58,7 @@ class Util
      * @param Variant|null $variant
      * @return bool
      */
-    public static function qualifyVariantImport(array $variant_data)
+    public static function filterVariantImport(array $variant_data)
     {
         return true;
     }
@@ -69,7 +69,7 @@ class Util
      * @param Variant $variant
      * @return bool
      */
-    public static function qualifyOrderItemUpdate(array $line_item_data, OrderItem $order_item, Variant $variant)
+    public static function filterOrderItemUpdate(array $line_item_data, OrderItem $order_item, Variant $variant)
     {
         return ! empty($line_item_data['product_id'])
             && ! empty($line_item_data['variant_id']);
@@ -80,7 +80,7 @@ class Util
      * @param Order $order
      * @return bool
      */
-    public static function qualifyOrderUpdate(array $order_data, Order $order)
+    public static function filterOrderUpdate(array $order_data, Order $order)
     {
         return $order_data['id'] == $order->store_order_id;
     }
@@ -90,7 +90,7 @@ class Util
      * @param Product $product
      * @return bool
      */
-    public static function qualifyProductUpdate(array $product_data, Product $product)
+    public static function filterProductUpdate(array $product_data, Product $product)
     {
         return $product_data['id'] == $product->store_product_id;
     }
@@ -101,7 +101,7 @@ class Util
      * @param Variant $variant
      * @return bool
      */
-    public static function qualifyVariantUpdate(array $variant_data, Product $product, Variant $variant)
+    public static function filterVariantUpdate(array $variant_data, Product $product, Variant $variant)
     {
         return $product->variants->contains('store_variant_id', $variant_data['id']);
     }

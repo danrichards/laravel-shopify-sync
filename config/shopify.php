@@ -1,32 +1,6 @@
 <?php
 
-use Dan\Shopify\Shopify;
-
 return [
-
-    /*
-    |--------------------------------------------------------------------------
-    | App settings
-    |--------------------------------------------------------------------------
-    |
-    | Settings for your App
-    |
-    */
-
-    'app' => [
-        'scopes' => [
-            Shopify::SCOPE_WRITE_PRODUCTS,
-            Shopify::SCOPE_WRITE_ORDERS,
-            Shopify::SCOPE_WRITE_FULFILLMENTS,
-            Shopify::SCOPE_WRITE_SHIPPING,
-            Shopify::SCOPE_WRITE_CONTENT,
-            Shopify::SCOPE_WRITE_THEMES,
-            Shopify::SCOPE_WRITE_SCRIPT_TAGS,
-            Shopify::SCOPE_READ_ANALYTICS,
-            Shopify::SCOPE_READ_ORDERS_ALL,
-        ],
-        'webhooks' => [],
-    ],
 
     /*
     |--------------------------------------------------------------------------
@@ -71,8 +45,8 @@ return [
             /* REQUIRED */ 'customer.store_created_at' => 'store_created_at',
             /* REQUIRED */ 'customer.store_updated_at' => 'store_updated_at',
         ],
-        'import_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyCustomerImport',
-        'update_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyCustomerUpdate',
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterCustomerImport',
+        'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterCustomerUpdate',
     ],
 
     /*
@@ -198,10 +172,10 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
-        'import_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyOrderImport',
-        'update_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyOrderUpdate',
-        'refund_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyOrderRefund',
-        'cancel_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyOrderCancel',
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderImport',
+        'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderUpdate',
+        'refund_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderRefund',
+        'cancel_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderCancel',
         'items' => [
             'model' => \Dan\Shopify\Laravel\Models\OrderItem::class,
             'map' => [
@@ -232,9 +206,9 @@ return [
                 /* REQUIRED */ 'fulfilled_at' => 'fulfilled_at',
                 'variant_inventory_management' => 'variant_inventory_management',
             ],
-            'import_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyLineItemImport',
-            'update_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyLineItemUpdate',
-            'refund_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyLineItemRefund',
+            'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemImport',
+            'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemUpdate',
+            'refund_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemRefund',
             'refunded_titles_append' => ' *Refunded',
             'partially_refunded_titles_append' => ' *Partially Refunded',
         ],
@@ -249,7 +223,7 @@ return [
     |
     */
     'products' => [
-        'model' => \Dan\Shopify\Laravel\Models\Product::class,
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterProductImport',
         'map' => [
             /* REQUIRED */ 'id' => 'store_product_id',
             'admin_graphql_api_id' => 'admin_graphql_api_id',
@@ -268,10 +242,9 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
-        'import_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyProductImport',
-        'update_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyProductUpdate',
+        'model' => \Dan\Shopify\Laravel\Models\Product::class,
         'variants' => [
-            'model' => \Dan\Shopify\Laravel\Models\Variant::class,
+            'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterVariantImport',
             'map' => [
                 /* REQUIRED */ 'id' => 'store_variant_id',
                 /* REQUIRED */ 'product_id' => 'store_product_id',
@@ -298,8 +271,8 @@ return [
                 /* REQUIRED */ 'created_at' => 'store_created_at',
                 /* REQUIRED */ 'updated_at' => 'store_updated_at',
             ],
-            'import_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyVariantImport',
-            'update_qualifier' => 'Dan\Shopify\Laravel\Support\Util::qualifyVariantUpdate',
+            'model' => \Dan\Shopify\Laravel\Models\Variant::class,
+            'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterVariantUpdate',
         ]
     ],
 
@@ -312,7 +285,6 @@ return [
     |
     */
     'stores' => [
-        'model' => \Dan\Shopify\Laravel\Models\Store::class,
         'map' => [
             /* REQUIRED */ 'primary_location_id' => 'store_primary_location_id',
             /* REQUIRED */ 'name' => 'name',
@@ -366,7 +338,9 @@ return [
             'setup_required' => 'setup_required',
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
-        ]
+        ],
+        'model' => \Dan\Shopify\Laravel\Models\Store::class,
+        'updatable' => '*',
     ],
 
     'sync' => [

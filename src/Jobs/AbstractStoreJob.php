@@ -4,7 +4,6 @@ namespace Dan\Shopify\Laravel\Jobs;
 
 use Cache;
 use Dan\Shopify\Laravel\Models\Store;
-use Dan\Shopify\Laravel\Support\Util;
 use Dan\Shopify\Shopify;
 use Log;
 
@@ -24,6 +23,8 @@ abstract class AbstractStoreJob extends AbstractJob
     public function __construct(Store $store)
     {
         $this->store = $store;
+
+        ini_set('max_execution_time', config('shopify.sync.max_execution_time'));
     }
 
     /**

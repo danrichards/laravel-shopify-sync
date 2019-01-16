@@ -30,10 +30,10 @@ class ProductService extends AbstractService
     protected $variants_data = [];
 
     /** @var Collection|null */
-    protected $qualified_variants;
+    protected $filtered_variants;
 
     /** @var Collection|null $variants */
-    protected $qualified_variants_data = null;
+    protected $filtered_variants_data = null;
 
     /** @var bool $imported */
     protected $imported;
@@ -69,7 +69,7 @@ class ProductService extends AbstractService
             $this->product->fill($attributes);
             $this->product->save();
 
-            foreach ($this->getQualifiedVariants() as $variant) {
+            foreach ($this->getFilteredVariants() as $variant) {
                 $variant->save();
                 $this->variants[$variant->store_variant_id] = $variant;
             }
@@ -165,45 +165,45 @@ class ProductService extends AbstractService
     /**
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getQualifiedVariants()
+    public function getFilteredVariants()
     {
         // The variants are already cached, send them back
-        if (! is_null($this->qualified_variants)) {
-            return $this->qualified_variants;
+        if (! is_null($this->filtered_variants)) {
+            return $this->filtered_variants;
         }
 
-        $this->qualified_variants = $this->getQualifiedVariantsData()
+        $this->filtered_variants = $this->getFilteredVariantsData()
             ->map(function(array $d) {
                 if ($v = $this->getVariants()->get($d['id'])) {
-                    return $v->fillVariantMap($v, $d);
+                    return $this->fillVariantMap($v, $d);
                 }
 
                 return $this->fillNewVariantMap($d);
             });
 
-        return $this->qualified_variants;
+        return $this->filtered_variants;
     }
 
     /**
      * @return \Illuminate\Database\Eloquent\Collection
      */
-    public function getQualifiedVariantsData()
+    public function getFilteredVariantsData()
     {
         // The variants are already cached, send them back
-        if (! is_null($this->qualified_variants_data)) {
-            return $this->qualified_variants_data;
+        if (! is_null($this->filtered_variants_data)) {
+            return $this->filtered_variants_data;
         }
 
         $variants_data = $this->product_data['variants'] ?? [];
 
-        return $this->qualified_variants_data = collect($variants_data)
+        return $this->filtered_variants_data = collect($variants_data)
             ->filter(function(array $d) {
                 if ($v = $this->getVariants()->get($d['id'])) {
                     $p = $this->product;
-                    return $this->util()::qualifyVariantUpdate($d, $p, $v);
+                    return $this->util()::filterVariantUpdate($d, $p, $v);
                 }
 
-                return $this->util()::qualifyVariantImport($d);
+                return $this->util()::filterVariantImport($d);
             })
             ->keyBy('id');
     }
@@ -237,34 +237,13 @@ class ProductService extends AbstractService
         try {
             DB::beginTransaction();
 
+            $this->fillMap($this->product_data);
+            $this->product->fill($attributes);
             $this->product->save();
 
-            foreach ($this->variants_data as $variant_data) {
-                $variant = $this->qualified_variants
-                    ->first(function($v) use ($variant_data) {
-                        return $v->store_variant_id = $variant_data['id'];
-                    });
-
-                $variant = $variant
-                    ? $this->fillVariantMap($variant_data)
-                    : $this->fillNewVariantMap($variant_data);
-
-                if (empty($variant->product_id)) {
-                    $variant->product()->associate($this->product);
-                }
+            foreach ($this->getFilteredVariants() as $variant) {
                 $variant->save();
-
-                $this->qualified_variants->push($variant);
-
-                $store_variant_ids = collect($this->variants_data)->pluck('id');
-
-                $this->qualified_variants->reject(function(Variant $v) use ($store_variant_ids) {
-                    if ($store_variant_ids->contains($v->store_variant_id)) {
-                        return $v->delete();
-                    }
-
-                    return false;
-                });
+                $this->variants[$variant->store_variant_id] = $variant;
             }
 
             DB::commit();

@@ -5,7 +5,7 @@ namespace Dan\Shopify\Laravel\Events\Stores;
 /**
  * Class ProductsSynced
  */
-class ProductsSynced
+class ProductsSynced extends AbstractStoreEvent
 {
 
 }

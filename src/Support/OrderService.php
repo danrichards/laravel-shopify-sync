@@ -58,11 +58,11 @@ class OrderService extends AbstractService
     /** @var Collection|null $order_items */
     protected $order_items;
 
-    /** @var Collection|null $qualified_line_items_data */
-    protected $qualified_line_items_data = [];
+    /** @var Collection|null $filtered_line_items_data */
+    protected $filtered_line_items_data = [];
 
-    /** @var Collection|null $qualified_variants */
-    protected $qualified_variants;
+    /** @var Collection|null $filtered_variants */
+    protected $filtered_variants;
 
     /** @var bool $imported */
     protected $imported;
@@ -149,13 +149,13 @@ class OrderService extends AbstractService
             $this->order->fill($attributes);
             $this->order->save();
 
-            foreach ($this->getQualifiedOrderItems() as $oi) {
+            foreach ($this->getFilteredOrderItems() as $oi) {
                 $oi->save();
                 $this->order_items[$oi->store_line_item_id] = $oi;
             }
 
 //            // Handle any line items that have been refunded.
-//            foreach ($this->getQualifiedLineItemsData() as $line_item) {
+//            foreach ($this->getFilteredLineItemsData() as $line_item) {
 //                $item_quantities[$line_item['id']] = $line_item['quantity'];
 //
 //                $order_item = $this->fillNewOrderItem($line_item);
@@ -165,7 +165,7 @@ class OrderService extends AbstractService
 //                $this->order_items->push($order_item);
 //            }
 //
-//            $refunded_quantity = $this->getQualifiedLineItemsData()
+//            $refunded_quantity = $this->getFilteredLineItemsData()
 //                ->sum(function($item) {
 //                    return static::refundedQuantityForLineItem($this->order_data, $item['id']);
 //                });
@@ -210,15 +210,19 @@ class OrderService extends AbstractService
      */
     public function fillCustomer(array $order_data, array $attributes = [])
     {
+        $store = $this->getStore();
         $customer_model = config('shopify.customers.model');
-        $email = $order_data['email'] ?? $order_data['customer_email'];
+        $sc_id = array_get($order_data, 'customer.id');
+        $email = array_get($order_data, 'email', array_get($order_data, 'customer_email'));
 
-        if (! empty($c = $customer_model::findByEmail($email, $this->getStore()))) {
-            $this->customer = $c;
-        } else {
-            // Use the seller email if there isn't one on the order.
-            $this->customer = $c = $customer_model::findNullEmail($this->getStore())
-                ?: new $customer_model();
+        $c = $customer_model::findByStoreCustomerId($sc_id, $store);
+
+        if (empty($c) && ! empty($email)) {
+            $c = $customer_model::findByEmail($email, $store);
+        }
+
+        if (empty($c)) {
+            $c = new $customer_model;
         }
 
         $map = config('shopify.customers.map_from_orders');
@@ -239,7 +243,7 @@ class OrderService extends AbstractService
      */
     protected function fillNewOrderItem(array $line_item, array $attributes = [])
     {
-        $variant = $this->getQualifiedVariants()[$line_item['variant_id']];
+        $variant = $this->getFilteredVariants()[$line_item['variant_id']];
 
         if (empty($product = $variant->product()->withTrashed()->first())) {
             throw new BadMethodCallException('Product not found');
@@ -368,10 +372,10 @@ class OrderService extends AbstractService
     /**
      * @return BaseCollection
      */
-    protected function getQualifiedOrderItems()
+    protected function getFilteredOrderItems()
     {
         // Handle any line items that have been refunded.
-        return $this->getQualifiedLineItemsData()
+        return $this->getFilteredLineItemsData()
             ->map(function(array $li) {
                 if ($oi = $this->getOrderItems()->get($li['id'])) {
                     return $this->fillOrderItem($oi, $li);
@@ -391,21 +395,21 @@ class OrderService extends AbstractService
      *
      * @return \Illuminate\Support\Collection
      */
-    protected function getQualifiedLineItemsData()
+    protected function getFilteredLineItemsData()
     {
-        if ($this->qualified_line_items_data) {
-            return $this->qualified_line_items_data;
+        if ($this->filtered_line_items_data) {
+            return $this->filtered_line_items_data;
         }
 
         $line_items = $this->order_data['line_items'] ?? [];
 
-        return $this->qualified_line_items_data = collect($line_items)
+        return $this->filtered_line_items_data = collect($line_items)
             ->filter(function(array $li) {
                 if ($oi = $this->getOrderItems()->get($li['id'])) {
-                    return $this->util()::qualifyOrderItemUpdate($li, $oi, $oi->variant);
+                    return $this->util()::filterOrderItemUpdate($li, $oi, $oi->variant);
                 }
 
-                return $this->util()::qualifyOrderItemImport($li, $lookup = null);
+                return $this->util()::filterOrderItemImport($li, $lookup = null);
             })
             ->keyBy('id');
     }
@@ -413,14 +417,14 @@ class OrderService extends AbstractService
     /**
      * @return Collection
      */
-    public function getQualifiedVariants()
+    public function getFilteredVariants()
     {
         // The variants are already cached, send them back
-        if (! is_null($this->qualified_variants)) {
-            return $this->qualified_variants;
+        if (! is_null($this->filtered_variants)) {
+            return $this->filtered_variants;
         }
 
-        $ids = $this->getQualifiedLineItemsData()
+        $ids = $this->getFilteredLineItemsData()
             ->pluck('id', 'variant_id')
             ->keys()
             ->filter()
@@ -429,7 +433,7 @@ class OrderService extends AbstractService
         $variant_model = config('shopify.products.variants.model');
 
         // Get them variants from the DB
-        $data = $this->qualified_variants = (new $variant_model)
+        $data = $this->filtered_variants = (new $variant_model)
             ->newQuery()
             ->whereIn('store_variant_id', $ids)
             ->get()
@@ -445,11 +449,11 @@ class OrderService extends AbstractService
      *
      * @return \Illuminate\Support\Collection
      */
-    public function getUnqualifiedLineItemsData()
+    public function getUnfilteredLineItemsData()
     {
         $line_items = $this->order_data['line_items'] ?? [];
 
-        $ids = $this->getQualifiedVariants()->keys();
+        $ids = $this->getFilteredVariants()->keys();
 
         return collect($line_items)
             ->filter(function(array $line_item) use ($ids) {
@@ -482,11 +486,11 @@ class OrderService extends AbstractService
         $this->updated = false;
 
         if ($this->order->exists) {
-            $this->qualified_line_items_data = $this->getQualifiedLineItemsData();
+            $this->filtered_line_items_data = $this->getFilteredLineItemsData();
             $this->order_items = $this->order->order_items;
             $this->customer = $this->order->customer;
         } else {
-            $this->qualified_line_items_data = $this->getQualifiedLineItemsData();
+            $this->filtered_line_items_data = $this->getFilteredLineItemsData();
             $this->order_items = collect();
             $this->customer = $this->fillCustomer($this->order_data);
         }
@@ -497,13 +501,13 @@ class OrderService extends AbstractService
     /**
      * @return bool
      */
-    public function isQualified()
+    public function isFiltered()
     {
         return $this->order && $this->imported
-            ? $this->util()::qualifyOrderUpdate($this->order_data, $this->order)
-                && $this->getQualifiedLineItemsData()->count()
-            : $this->util()::qualifyOrderImport($this->order_data)
-                && $this->getQualifiedLineItemsData()->count();
+            ? $this->util()::filterOrderUpdate($this->order_data, $this->order)
+                && $this->getFilteredLineItemsData()->count()
+            : $this->util()::filterOrderImport($this->order_data)
+                && $this->getFilteredLineItemsData()->count();
     }
 
     /**
@@ -512,9 +516,9 @@ class OrderService extends AbstractService
      * @param Order|null $order
      * @return bool
      */
-    public static function qualify(Store $store, array $order_data, Order $order = null)
+    public static function filter(Store $store, array $order_data, Order $order = null)
     {
-        return (new static($store, $order_data, $order))->isQualified();
+        return (new static($store, $order_data, $order))->isFiltered();
     }
 
     /**
@@ -552,7 +556,7 @@ class OrderService extends AbstractService
         if (config('shopify.orders.log_tests')
             && isset($order_data['test'])
             && $order_data['test']
-            && ! empty($this->qualified_line_items_data)
+            && ! empty($this->filtered_line_items_data)
             && ! $this->order->exists) {
             $this->msg('test_order', $order_data, 'info');
         }

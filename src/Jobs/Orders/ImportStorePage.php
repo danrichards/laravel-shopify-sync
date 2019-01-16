@@ -133,7 +133,7 @@ class ImportStorePage extends AbstractStoreJob
                     continue;
                 }
 
-                if (OrderService::qualify($store, $api_order)) {
+                if (OrderService::filter($store, $api_order)) {
                     $importing[$id] = $api_order['number'];
                 } else {
                     $ignoring[$id] = $api_order['number'];

@@ -11,17 +11,30 @@ use DB;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Collection as BaseCollection;
 
 /**
  * Class ImportStorePage
  */
 class ImportStorePage extends AbstractStoreJob
 {
-    /** @var int $tries */
-    public $tries = 1;
+    /** @var bool $dryrun */
+    protected $dryrun;
 
-    /** @var Store $store */
-    protected $store;
+    /** @var BaseCollection $existing_product_ids */
+    protected $existing_product_ids;
+
+    /** @var bool $filter_existing */
+    protected $filter_existing = true;
+
+    /** @var $finished */
+    protected $finished;
+
+    /** @var int $limit */
+    protected $limit;
+
+    /** @var int $page */
+    protected $page;
 
     /** @var array $pages */
     protected $pages;
@@ -29,20 +42,14 @@ class ImportStorePage extends AbstractStoreJob
     /** @var string $params */
     protected $params;
 
-    /** @var bool $dryrun */
-    protected $dryrun;
-
-    /** @var int $page */
-    protected $page;
-
     /** @var int $total */
     protected $total;
 
-    /** @var int $limit */
-    protected $limit;
-
     /** @var array $started */
     protected $started;
+
+    /** @var Store $store */
+    protected $store;
 
     /**
      * ImportStorePage constructor.
@@ -73,86 +80,24 @@ class ImportStorePage extends AbstractStoreJob
     }
 
     /**
-     * @return $this
+     * @param int $limit
      */
-    public function handle()
+    protected function failWithRetry($limit): void
     {
-        $this->started = [
-            'microtime' => microtime(true),
-            'carbon' => now()
-        ];
+        $this->msg('retrying_with_new_limit', compact('limit'));
 
-        ini_set('max_execution_time', config('shopify.sync.max_execution_time'));
+        $created_at_min = $this->getStore()->last_product_import_at
+            ? $this->getStore()->last_product_import_at->format('c')
+            : $this->getStore()->created_at->format('c');
 
-        $store = $this->store;
-        $params = $this->params;
-        $page = $this->page;
-        $page_sleep = config('shopify.sync.sleep_between_page_requests');
-        $connection = $this->connection;
+        $job = new ImportStore(
+            $store = $this->getStore(),
+            $params = compact('created_at_min', 'limit') + $this->params,
+            $connection = $this->connection);
 
-        try {
-            $ids_numbers = [];
-
-            $this->msg('initiated', compact('page', 'params'), 'info');
-
-            // Iterate pages of products from Shopify
-            $api_products = $this->getApiClient()
-                ->products
-                ->get($params + compact('page'));
-
-            $this->msg('received', ['count' => count($api_products)], 'info');
-
-            $existing_ids = $this->existingProductIds($api_products);
-
-            $this->msg('existing', compact('existing_ids'), 'info');
-
-            $last_product_import_at = null;
-
-            foreach ($api_products as $api_product) {
-                $qualifier = config('shopify.products.import_qualifier');
-
-                if ($qualifier($api_product)) {
-                    $ids_numbers[] = $api_product['id'];
-
-                    $job = new ImportProduct($store, $api_product);
-
-                    $connection == 'sync'
-                        ? dispatch_now($job)
-                        : dispatch($job)->onConnection($connection);
-                }
-
-                $last_product_import_at = Carbon::parse($api_product['created_at']);
-            }
-
-            empty($ids_numbers)
-                ? $this->msg('no_products_queued', [], 'info')
-                : $this->msg('products_queued', $ids_numbers, 'info');
-
-            if ($last_product_import_at) {
-                $store->update(compact('last_product_import_at'));
-            }
-
-            // Is this the last page / product?
-            if (empty($api_products) || empty($this->pages)) {
-                ImportStore::unlock($store);
-                $this->msg('completed', [], 'info');
-                event(new ProductsSynced($this->store));
-            } else {
-                sleep($page_sleep);
-                $next_page = new static($store, $this->pages, $this->params, $connection, $this->dryrun);
-                $connection == 'sync'
-                    ? dispatch($next_page)->onConnection($connection)
-                    : dispatch_now($next_page);
-            }
-        } catch (ClientException $ce) {
-            $data = Util::exceptionArr($ce, $store->compact() + compact( 'page', 'total', 'params'));
-            $this->msg('api_failed', $data, 'error');
-        } catch (Exception $e) {
-            $data = Util::exceptionArr($e, $store->compact() + compact( 'page', 'total', 'params'));
-            $this->msg('failed', $data, 'error');
-        }
-
-        return $this;
+        $connection == 'sync'
+            ? dispatch_now($job)
+            : dispatch($job)->onConnection($connection);
     }
 
     /**
@@ -171,22 +116,9 @@ class ImportStorePage extends AbstractStoreJob
                 if ($limit == 1) {
                     $this->msg('unable_to_page', [], 'error');
 
-                // Otherwise, try a smaller page size.
+                // Otherwise, try a smaller page size. Things are timing out in the queue.
                 } else {
-                    $this->msg('retrying_with_new_limit', compact('limit'));
-
-                    $created_at_min = $store->last_product_import_at
-                        ? $store->last_product_import_at->format('c')
-                        : $store->created_at->format('c');
-
-                    $job = new ImportStore(
-                        $store = $this->getStore(),
-                        $params = compact('created_at_min', 'limit') + $this->params,
-                        $connection = $this->connection);
-
-                    $connection == 'sync'
-                        ? dispatch_now($job)
-                        : dispatch($job)->onConnection($connection);
+                    $this->failWithRetry($limit);
                 }
                 break;
             default:
@@ -195,20 +127,211 @@ class ImportStorePage extends AbstractStoreJob
     }
 
     /**
-     * @param array $api_products
-     * @return array
+     * Keyed by store_product_id
+     *
+     * @param BaseCollection $api_products
+     * @return BaseCollection
      */
-    protected function existingProductIds(array $api_products): array
+    protected function getExistingProductIds(BaseCollection $api_products): BaseCollection
     {
-        $api_product_ids = array_pluck($api_products, 'id');
+        if (! is_null($this->existing_product_ids)) {
+            return $this->existing_product_ids;
+        }
 
-        $existing_db_products = DB::table('products')
-            ->where('store_type', Store::class)
+        $api_product_ids = $api_products->pluck('id')->all();
+
+        $this->existing_product_ids = DB::table('products')
+            ->where('store_type', config('shopify.stores.model'))
             ->where('store_id', $this->getStore()->getKey())
             ->whereIn('store_product_id', $api_product_ids)
-            ->pluck('store_product_id')
-            ->all();
+            ->pluck('id', 'store_product_id');
 
-        return $existing_db_products;
+        $this->msg('existing', ['ids' => $this->existing_product_ids], 'info');
+
+        return $this->existing_product_ids;
+    }
+
+    /**
+     * @param BaseCollection $api_products
+     * @return Carbon|null
+     */
+    protected function getLastProductImportAt($api_products)
+    {
+        $latest = $api_products
+            ->sortByDesc('created_at')
+            ->first();
+
+        return $latest ? Carbon::parse($latest['created_at']) : null;
+    }
+
+    /**
+     * @return BaseCollection
+     * @throws \Dan\Shopify\Exceptions\InvalidOrMissingEndpointException
+     */
+    protected function getProductsFromApi(): BaseCollection
+    {
+        // Iterate pages of products from Shopify
+        $api_products = $this->getApiClient()
+            ->products
+            ->get($this->params + ['page' => $this->page]);
+
+        $this->msg('received', ['count' => count($api_products)], 'info');
+
+        return collect($api_products);
+    }
+
+    /**
+     * @return $this
+     */
+    public function handle()
+    {
+        $this->handleStart();
+
+        try {
+            $api_products = $this->getProductsFromApi();
+            $last_product_import_at = $this->getLastProductImportAt($api_products);
+
+            $filter = config('shopify.products.import_filter');
+            $existing = $this->getExistingProductIds($api_products);
+
+            $dispatched = [];
+
+            $api_products->when($this->filter_existing,
+                function(BaseCollection $col) use ($existing) {
+                    return $col->reject(function(array $api_product) use ($existing) {
+                        return $existing->has($api_product['id']);
+                    });
+                })
+                ->filter(function(array $api_product) use ($filter) {
+                    return $filter($api_product);
+                })
+                ->each(function(array $api_product) use (&$dispatched) {
+                    $this->handleDispatchImportProduct($api_product);
+                    $dispatched[] = $api_product['id'];
+                });
+
+            $this->handleCurrentPageFinished($last_product_import_at);
+
+            // Is this the last page / product?
+            if (empty($api_products) || empty($this->pages)) {
+                $this->handleLastPageFinished();
+            } else {
+                $this->handleDispatchNextPage();
+            }
+        } catch (ClientException $ce) {
+            $this->handleClientException($ce);
+        } catch (Exception $e) {
+            $this->handleException($e);
+        }
+
+        $this->handleFinished();
+
+        return $this;
+    }
+
+    /**
+     * @param $ce
+     */
+    protected function handleClientException($ce): void
+    {
+        $data = Util::exceptionArr($ce, $this->getStore()->compact() + [
+                'page' => $this->page,
+                'total' => $this->total,
+                'params' => $this->params,
+            ]);
+
+        $this->msg('api_failed', $data, 'error');
+    }
+
+    /**
+     * @param Carbon|null $last_product_import_at
+     */
+    protected function handleCurrentPageFinished(?Carbon $last_product_import_at): void
+    {
+        if ($last_product_import_at) {
+            $this->getStore()->update(compact('last_product_import_at'));
+        }
+    }
+
+    /**
+     * @param array $api_product
+     */
+    protected function handleDispatchImportProduct($api_product): void
+    {
+        $job = new ImportProduct($this->getStore(), $api_product);
+
+        $this->connection == 'sync'
+            ? dispatch_now($job)
+            : dispatch($job)->onConnection($this->connection);
+    }
+
+    /**
+     * @return void;
+     */
+    protected function handleDispatchNextPage(): void
+    {
+        $connection = $this->connection;
+
+        sleep(config('shopify.sync.sleep_between_page_requests'));
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun);
+        $connection == 'sync'
+            ? dispatch($next_page)->onConnection($connection)
+            : dispatch_now($next_page);
+    }
+
+    /**
+     * @param Exception $e
+     */
+    protected function handleException(Exception $e): void
+    {
+        $data = Util::exceptionArr($e, $this->getStore()->compact() + [
+                'page' => $this->page,
+                'total' => $this->total,
+                'params' => $this->params,
+            ]);
+
+        $this->msg('failed', $data, 'error');
+    }
+
+    /**
+     * @return void
+     */
+    protected function handleFinished(): void
+    {
+        $this->finished = $finished = [
+            'microtime' => microtime(true),
+            'carbon' => now()
+        ];
+
+        $this->msg('finished', compact('finished') + [
+            'page' => $this->page,
+            'params' => $this->params,
+        ], 'info');
+    }
+
+    /**
+     * @param Store $store
+     */
+    protected function handleLastPageFinished(): void
+    {
+        ImportStore::unlock($this->getStore());
+        $this->msg('completed', [], 'info');
+        event(new ProductsSynced($this->getStore()));
+    }
+
+    /**
+     * @return void
+     */
+    protected function handleStart(): void
+    {
+        $this->started = $started = [
+            'microtime' => microtime(true),
+            'carbon' => now()
+        ];
+
+        $this->msg('started', compact('started') + [
+            'page' => $this->page,
+            'params' => $this->params,
+        ], 'info');
     }
 }
