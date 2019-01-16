@@ -110,7 +110,7 @@ class Customer extends Model
      */
     public static function findByStoreCustomerId($email, $store = null)
     {
-        return static::where('email', $email)
+        return static::where('store_customer_id', $email)
             ->when($store, function(Builder $q, $s) {
                 $q->whereMorph($s, 'store');
             })

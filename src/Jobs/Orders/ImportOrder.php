@@ -45,7 +45,8 @@ class ImportOrder extends AbstractStoreJob
             $wait = config('shopify.sync.update_lock_minutes');
 
             if ($order->created_at->lt(new Carbon("-{$wait} minutes"))) {
-                (new OrderService($store, $data, $order))->update();
+                // TODO: (new OrderService($store, $data, $order))->update();
+                $this->msg('TODO: OrderService::update()', [], 'debug');
             } else {
                 $this->msg('update_locked', $order->compact(), 'warning');
             }

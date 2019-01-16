@@ -225,12 +225,15 @@ class OrderService extends AbstractService
             $c = new $customer_model;
         }
 
+        $this->customer = $c;
+
         $map = config('shopify.customers.map_from_orders');
         $model = $c->exists ? $c : config('shopify.customers.model');
         $mapped_data = $this->util()::mapData($order_data, $map, $model);
 
         $data = $attributes
             + $mapped_data
+            + $this->getStore()->unmorph('store')
             + ['synced_at' => new Carbon('now')];
 
         return $this->customer->fill($data);
@@ -569,7 +572,7 @@ class OrderService extends AbstractService
 //     */
 //    public function update(array $product_data, array $attributes =  [])
 //    {
-
+//
 //        $this->fill($this->order_data, $attributes);
 //
 //        $order_items = $this->order_items->keyBy('store_line_item_id');
