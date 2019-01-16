@@ -12,7 +12,7 @@ return [
     */
 
     'customers' => [
-        'model' => \Dan\Shopify\Laravel\Models\Customer::class,
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterCustomerImport',
         'map_from_orders' => [
             /* REQUIRED */ 'customer.id' => 'store_customer_id',
             /* REQUIRED */ 'customer.last_order_id' => 'store_last_order_id',
@@ -45,7 +45,8 @@ return [
             /* REQUIRED */ 'customer.store_created_at' => 'store_created_at',
             /* REQUIRED */ 'customer.store_updated_at' => 'store_updated_at',
         ],
-        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterCustomerImport',
+        'map_updatable' => '*',
+        'model' => \Dan\Shopify\Laravel\Models\Customer::class,
         'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterCustomerUpdate',
     ],
 
@@ -58,8 +59,9 @@ return [
     |
     */
     'orders' => [
+        'cancel_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderCancel',
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderImport',
         'log_tests' => env('SHOPIFY_ORDERS_LOG_TESTS', 1),
-        'model' => \Dan\Shopify\Laravel\Models\Order::class,
         'map' => [
             /* REQUIRED */ 'id' => 'store_order_id',
             'user_id' => 'store_user_id',
@@ -172,12 +174,24 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
-        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderImport',
-        'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderUpdate',
+        'map_updatable' => '*',
+        'model' => \Dan\Shopify\Laravel\Models\Order::class,
         'refund_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderRefund',
-        'cancel_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderCancel',
+        'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderUpdate',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Product settings
+    |--------------------------------------------------------------------------
+    |
+    | Settings for your Product models
+    |
+    */
+    'products' => [
+        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterProductImport',
         'items' => [
-            'model' => \Dan\Shopify\Laravel\Models\OrderItem::class,
+            'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemImport',
             'map' => [
                 /* REQUIRED */ 'id' => 'store_line_item_id',
                 /* REQUIRED */ 'product_id' => 'store_product_id',
@@ -206,24 +220,12 @@ return [
                 /* REQUIRED */ 'fulfilled_at' => 'fulfilled_at',
                 'variant_inventory_management' => 'variant_inventory_management',
             ],
-            'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemImport',
-            'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemUpdate',
+            'model' => \Dan\Shopify\Laravel\Models\OrderItem::class,
+            'partially_refunded_titles_append' => ' *Partially Refunded',
             'refund_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemRefund',
             'refunded_titles_append' => ' *Refunded',
-            'partially_refunded_titles_append' => ' *Partially Refunded',
+            'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterLineItemUpdate',
         ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Product settings
-    |--------------------------------------------------------------------------
-    |
-    | Settings for your Product models
-    |
-    */
-    'products' => [
-        'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterProductImport',
         'map' => [
             /* REQUIRED */ 'id' => 'store_product_id',
             'admin_graphql_api_id' => 'admin_graphql_api_id',
@@ -242,6 +244,7 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
+        'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Product::class,
         'variants' => [
             'import_filter' => 'Dan\Shopify\Laravel\Support\Util::filterVariantImport',
@@ -271,6 +274,7 @@ return [
                 /* REQUIRED */ 'created_at' => 'store_created_at',
                 /* REQUIRED */ 'updated_at' => 'store_updated_at',
             ],
+            'map_updatable' => '*',
             'model' => \Dan\Shopify\Laravel\Models\Variant::class,
             'update_filter' => 'Dan\Shopify\Laravel\Support\Util::filterVariantUpdate',
         ]
@@ -339,8 +343,8 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
+        'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Store::class,
-        'updatable' => '*',
     ],
 
     'sync' => [
