@@ -107,7 +107,9 @@ class ImportStorePage extends AbstractStoreJob
     {
         $this->handleFinish();
 
-        $elapsed = $this->finished['microtime'] - $this->started['microtime'];
+        /** @var Carbon $finished */
+        $finished = $this->finished['carbon'];
+        $elapsed = $finished->diffInSeconds($this->started['microtime'] ?? now());
 
         switch (true) {
             case $e instanceof MaxAttemptsExceededException:
