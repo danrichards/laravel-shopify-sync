@@ -13,7 +13,7 @@ use Illuminate\Database\Eloquent\Builder;
 class UpdateStores extends AbstractCommand
 {
     /** @var string $signature */
-    protected $signature = 'shopify:update:stores {--store_ids=any} {--updated_at_min=} {--customer_count} {--order_count} {--product_count} {--connection=sync}';
+    protected $signature = 'shopify:update:stores {--store_ids=any} {--updated_at_max=} {--customer_count} {--order_count} {--product_count} {--connection=sync}';
 
     /** @var string $description */
     protected $description = 'Update Shopify Store Information';
@@ -84,14 +84,18 @@ class UpdateStores extends AbstractCommand
         /** @var Store $store_model */
         $store_model = new $store_model;
 
+        $updated_at_max = $this->option('updated_at_max')
+            ? (new Carbon($this->option('updated_at_max')))
+                ->format("Y-m-d H:i:s")
+            : null;
+
         return $store_model
             ->forInstalled()
             ->when($this->optionIds('store_ids'), function (Builder $q, $store_ids) {
                 $q->whereIn('stores.id', $store_ids);
             })
-            ->when($this->option('updated_at_min'), function(Builder $q, $t) {
-                $updated_at_min = (new Carbon($t))->format("Y-m-d H:i:s");
-                $q->where('updated_at', '>', $updated_at_min);
+            ->when($updated_at_max, function(Builder $q, $refresh) {
+                $q->where('updated_at', '<', $refresh);
             });
     }
 
