@@ -105,9 +105,14 @@ class ImportStorePage extends AbstractStoreJob
      */
     public function failed(Exception $e)
     {
+        $this->handleFinish();
+
+        $elapsed = $this->finished['microtime'] - $this->started['microtime'];
+
         switch (true) {
             case $e instanceof MaxAttemptsExceededException:
-                $this->msg('queue_max_attempts_failure', $this->params , 'error');
+                $data = $this->params + compact('elapsed');
+                $this->msg('queue_max_attempts_failure', $data, 'error');
                 $limit = intval($this->params['limit'] / 2);
 
                 ImportStore::unlock($store = $this->getStore());
@@ -122,7 +127,10 @@ class ImportStorePage extends AbstractStoreJob
                 }
                 break;
             default:
-                $this->msg('sqs_failed', ['msg' => $e->getMessage()], 'emergency');
+                // Do not unlock, presumably, it'll just fail again.
+                $this->msg('sqs_failed', [
+                    'msg' => $e->getMessage(),
+                ] + compact('elapsed'), 'emergency');
         }
     }
 

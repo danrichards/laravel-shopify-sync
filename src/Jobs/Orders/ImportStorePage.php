@@ -212,7 +212,7 @@ class ImportStorePage extends AbstractStoreJob
                     });
                 })
                 ->filter(function(array $api_order) use ($filter) {
-                    return OrderService::filter($this->getStore(), ($api_order));
+                    return OrderService::filter($this->getStore(), $api_order);
                 })
                 ->each(function(array $api_order) use (&$dispatched) {
                     $this->handleDispatchImportOrder($api_order);
