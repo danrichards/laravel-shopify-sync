@@ -12,6 +12,7 @@ use DB;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Collection as BaseCollection;
 
 /**
  * Class ImportStorePage
@@ -45,8 +46,11 @@ class ImportStorePage extends AbstractStoreJob
     /** @var int $limit */
     protected $limit;
 
-    /** @var array $started */
-    protected $started;
+    /** @var BaseCollection $existing_order_ids */
+    protected $existing_order_ids;
+
+    /** @var bool $filter_existing */
+    protected $filter_existing;
 
     /**
      * ImportStorePage constructor.
@@ -71,134 +75,24 @@ class ImportStorePage extends AbstractStoreJob
     }
 
     /**
-     * @return array
+     * @param int $limit
      */
-    public function getDefaultParams()
+    protected function failWithRetry($limit): void
     {
-        return [
-            'limit' => config('shopify.sync.limit'),
-            'order' => 'created_at asc',
-            'created_at_min' => $this->getStore()->last_order_import_at
-                ? $this->getStore()->last_order_import_at->format('c')
-                : $this->getStore()->created_at->format('c')
-        ];
-    }
+        $this->msg('retrying_with_new_limit', compact('limit'));
 
-    /**
-     * @return $this
-     */
-    public function handle()
-    {
-        $this->started = [
-            'microtime' => microtime(true),
-            'carbon' => now()
-        ];
+        $created_at_min = $this->getStore()->last_order_import_at
+            ? $this->getStore()->last_order_import_at->format('c')
+            : $this->getStore()->created_at->format('c');
 
-        ini_set('max_execution_time', config('shopify.sync.max_execution_time'));
+        $job = new ImportStore(
+            $store = $this->getStore(),
+            $params = compact('created_at_min', 'limit') + $this->params,
+            $connection = $this->connection);
 
-        $store = $this->store;
-        $params = $this->params;
-        $page = $this->page;
-        $page_sleep = config('shopify.sync.sleep_between_page_requests');
-        $connection = $this->connection;
-        $verb = $connection == 'sync' ? 'dispatched' : 'queued';
-
-        try {
-            $importing = [];
-            $ignoring = [];
-
-            $this->msg('initiated', compact('page', 'params'), 'info');
-
-            // Iterate pages of orders from Shopify
-            $api_orders = $this->getApiClient()
-                ->orders
-                ->get($params + compact('page'));
-
-            $this->msg('received', ['count' => count($api_orders)], 'info');
-
-            $existing_db_orders = $this->getExistingOrderIds($api_orders);
-            
-            $found = 0;
-
-            foreach ($api_orders as $api_order) {
-                $id = (string) $api_order['id'];
-
-                if (! isset($api_order['line_items'])) {
-                    $this->msg("order:{$id}:no_line_items", $api_order, 'warning');
-                    continue;
-                }
-
-                if (in_array($id, $existing_db_orders)) {
-                    $this->msg("order:{$id}:already_exists", $api_order, 'warning');
-                    continue;
-                }
-
-                if (OrderService::filter($store, $api_order)) {
-                    $importing[$id] = $api_order['number'];
-                } else {
-                    $ignoring[$id] = $api_order['number'];
-                    continue;
-                }
-
-                if ($this->dryrun) {
-                    $this->msg("order:{$id}:dryrun", [], 'info');
-                    continue;
-                }
-
-                $job = new ImportOrder($store, $api_order);
-
-                $this->msg("order:{$id}:{$verb}", [], 'info');
-
-                $found++;
-
-                $connection == 'sync'
-                    ? dispatch_now($job)
-                    : dispatch($job)->onConnection($connection);
-            }
-
-            if (empty($importing)) {
-                $this->msg('no_orders_queued',  [], 'info');
-            } else {
-                $this->msg('orders_queued', $importing, 'info');
-            }
-
-            if (! empty($ignoring)) {
-                $this->msg('orders_ignored', $ignoring, 'info');
-            }
-
-            // Set last_order_import_at to newest order created_at timestamp.
-            if (! empty($api_orders) && ($found || $this->page != $this->total)) {
-                $last_order_import_at = (Carbon::parse(array_last($api_orders)['created_at']))
-                    ->setTimeZone(config('app.timezone'));
-                $store->update(compact('last_order_import_at'));
-            // Or, set last_order_import_at to now if no orders!
-            } else {
-                // In case the job took awhile to run.
-                $last_order_import_at = new Carbon('30 minutes ago');
-                $store->update(compact('last_order_import_at'));
-            }
-
-            // Is this the last page / order?
-            if (empty($api_orders) || empty($this->pages)) {
-                ImportStore::unlock($store);
-                $this->msg('completed', [], 'info');
-                event(new OrdersSynced($this->store));
-            } else {
-                sleep($page_sleep);
-                $next_page = new static($store, $this->pages, $this->params, $connection, $this->dryrun);
-                $connection == 'sync'
-                    ? dispatch_now($next_page)
-                    : dispatch($next_page)->onConnection($connection);
-            }
-        } catch (ClientException $ce) {
-            $data = Util::exceptionArr($ce, compact( 'page', 'total', 'params'));
-            $this->msg('api_failed', $data, 'error');
-        } catch (Exception $e) {
-            $data = Util::exceptionArr($e, compact( 'page', 'total', 'params'));
-            $this->msg('failed', $data, 'error');
-        }
-
-        return $this;
+        $connection == 'sync'
+            ? dispatch_now($job)
+            : dispatch($job)->onConnection($connection);
     }
 
     /**
@@ -219,20 +113,7 @@ class ImportStorePage extends AbstractStoreJob
 
                 // Otherwise, try a smaller page size.
                 } else {
-                    $this->msg('retrying_with_new_limit', compact('limit'));
-
-                    $created_at_min = $store->last_order_import_at
-                        ? $store->last_order_import_at->format('c')
-                        : $store->created_at->format('c');
-
-                    $job = new ImportStore(
-                        $store = $this->getStore(),
-                        $params = compact('created_at_min', 'limit') + $this->params,
-                        $connection = $this->connection);
-
-                    $connection == 'sync'
-                        ? dispatch_now($job)
-                        : dispatch($job)->onConnection($connection);
+                    $this->failWithRetry($limit);
                 }
                 break;
             default:
@@ -241,22 +122,224 @@ class ImportStorePage extends AbstractStoreJob
     }
 
     /**
-     * @param array $api_orders
      * @return array
      */
-    protected function getExistingOrderIds(array $api_orders): array
+    public function getDefaultParams()
     {
-        $api_order_ids = array_pluck($api_orders, 'id');
+        return [
+            'limit' => config('shopify.sync.limit'),
+            'order' => 'created_at asc',
+            'created_at_min' => $this->getStore()->last_order_import_at
+                ? $this->getStore()->last_order_import_at->format('c')
+                : $this->getStore()->created_at->format('c')
+        ];
+    }
 
-        $existing_db_orders = DB::table('orders')
+    /**
+     * Keyed by store_order_id
+     *
+     * @param BaseCollection $api_orders
+     * @return BaseCollection
+     */
+    protected function getExistingOrderIds(BaseCollection $api_orders): BaseCollection
+    {
+        if (! is_null($this->existing_order_ids)) {
+            return $this->existing_order_ids;
+        }
+
+        $ids = $api_orders->pluck('id')->all();
+
+        $this->existing_order_ids = $ids = DB::table('orders')
             ->where('store_type', Store::class)
             ->where('store_id', $this->getStore()->getKey())
-            ->whereIn('store_order_id', $api_order_ids)
-            ->pluck('store_order_id')
-            ->all();
+            ->whereIn('store_order_id', $ids)
+            ->pluck('id', 'store_order_id');
 
-        $this->msg('existing', compact('existing_db_orders'), 'info');
+        $this->msg('existing', compact('ids'), 'info');
 
-        return $existing_db_orders;
+        return $this->existing_order_ids;
+    }
+
+    /**
+     * @param BaseCollection $api_orders
+     * @return Carbon|null
+     */
+    protected function getLastOrderImportAt($api_orders)
+    {
+        $latest = $api_orders
+            ->sortByDesc('created_at')
+            ->first();
+
+        return $latest ? Carbon::parse($latest['created_at']) : null;
+    }
+
+    /**
+     * @return BaseCollection
+     * @throws \Dan\Shopify\Exceptions\InvalidOrMissingEndpointException
+     */
+    protected function getOrdersFromApi(): BaseCollection
+    {
+        // Iterate pages of orders from Shopify
+        $api_orders = $this->getApiClient()
+            ->orders
+            ->get($this->params + ['page' => $this->page]);
+
+        $this->msg('received', ['count' => count($api_orders)], 'info');
+
+        return collect($api_orders);
+    }
+
+    /**
+     * @return $this
+     */
+    public function handle()
+    {
+        $this->handleStart();
+
+        try {
+            $api_orders = $this->getOrdersFromApi();
+            $last_order_import_at = $this->getLastOrderImportAt($api_orders);
+
+            $existing = $this->getExistingOrderIds($api_orders);
+            $filter = config('shopify.orders.import_filter');
+
+            $dispatched = [];
+
+            $api_orders->when($this->filter_existing,
+                function(BaseCollection $col) use ($existing) {
+                    return $col->reject(function(array $api_order) use ($existing) {
+                        return $existing->has($api_order['id']);
+                    });
+                })
+                ->filter(function(array $api_order) use ($filter) {
+                    return OrderService::filter($this->getStore(), ($api_order));
+                })
+                ->each(function(array $api_order) use (&$dispatched) {
+                    $this->handleDispatchImportOrder($api_order);
+                    $dispatched[] = $api_order['id'];
+                });
+
+            $this->handleCurrentPageFinished($last_order_import_at);
+
+            // Is this the last page / product?
+            if (! $api_orders->count() || empty($this->pages)) {
+                $this->handleLastPageFinished();
+            } else {
+                $this->handleDispatchNextPage();
+            }
+        } catch (ClientException $ce) {
+            $this->handleClientException($ce);
+        } catch (Exception $e) {
+            $this->handleException($e);
+        }
+
+        $this->handleFinish();
+
+        return $this;
+    }
+
+    /**
+     * @param $ce
+     * @return void
+     */
+    protected function handleClientException($ce): void
+    {
+        $data = Util::exceptionArr($ce, [
+            'page' => $this->page,
+            'total' => $this->total,
+            'params' => $this->params,
+        ]);
+
+        $this->msg('api_failed', $data, 'error');
+    }
+
+    /**
+     * @param Carbon|null $last_order_import_at
+     */
+    protected function handleCurrentPageFinished(?Carbon $last_order_import_at): void
+    {
+        if ($last_order_import_at) {
+            $this->getStore()->update(compact('last_order_import_at'));
+        }
+    }
+
+    /**
+     * @param array $api_order
+     * @return void
+     */
+    protected function handleDispatchImportOrder($api_order): void
+    {
+        $job = new ImportOrder($this->getStore(), $api_order);
+
+        if ($this->dryrun) {
+            $this->msg("order:{$api_order['id']}:dryrun", [], 'info');
+            return;
+        }
+
+        $this->connection == 'sync'
+            ? dispatch_now($job)
+            : dispatch($job)->onConnection($this->connection);
+    }
+
+    /**
+     * @return void;
+     */
+    protected function handleDispatchNextPage(): void
+    {
+        $connection = $this->connection;
+
+        sleep(config('shopify.sync.sleep_between_page_requests'));
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun);
+        $connection == 'sync'
+            ? dispatch($next_page)->onConnection($connection)
+            : dispatch_now($next_page);
+    }
+
+    /**
+     * @param Exception $e
+     */
+    protected function handleException(Exception $e): void
+    {
+        $data = Util::exceptionArr($e, [
+            'page' => $this->page,
+            'total' => $this->total,
+            'params' => $this->params,
+        ]);
+
+        $this->msg('failed', $data, 'error');
+    }
+
+    /**
+     * @param array $data
+     * @return void
+     */
+    protected function handleFinish(array $data = []): void
+    {
+        parent::handleFinish($data + [
+            'page' => $this->page,
+            'params' => $this->params,
+        ]);
+    }
+
+    /**
+     * @return void
+     */
+    protected function handleLastPageFinished(): void
+    {
+        ImportStore::unlock($this->getStore());
+        $this->msg('completed', [], 'info');
+        event(new OrdersSynced($this->getStore()));
+    }
+
+    /**
+     * @param array $data
+     * @return void
+     */
+    protected function handleStart(array $data = []): void
+    {
+        parent::handleStart($data + [
+            'page' => $this->page,
+            'params' => $this->params,
+        ]);
     }
 }

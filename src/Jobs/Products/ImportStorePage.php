@@ -138,15 +138,15 @@ class ImportStorePage extends AbstractStoreJob
             return $this->existing_product_ids;
         }
 
-        $api_product_ids = $api_products->pluck('id')->all();
+        $ids = $api_products->pluck('id')->all();
 
         $this->existing_product_ids = DB::table('products')
             ->where('store_type', config('shopify.stores.model'))
             ->where('store_id', $this->getStore()->getKey())
-            ->whereIn('store_product_id', $api_product_ids)
+            ->whereIn('store_product_id', $ids)
             ->pluck('id', 'store_product_id');
 
-        $this->msg('existing', ['ids' => $this->existing_product_ids], 'info');
+        $this->msg('existing', compact('ids'), 'info');
 
         return $this->existing_product_ids;
     }
@@ -213,7 +213,7 @@ class ImportStorePage extends AbstractStoreJob
             $this->handleCurrentPageFinished($last_product_import_at);
 
             // Is this the last page / product?
-            if (empty($api_products) || empty($this->pages)) {
+            if (! $api_products->count() || empty($this->pages)) {
                 $this->handleLastPageFinished();
             } else {
                 $this->handleDispatchNextPage();
@@ -224,7 +224,7 @@ class ImportStorePage extends AbstractStoreJob
             $this->handleException($e);
         }
 
-        $this->handleFinished();
+        $this->handleFinish();
 
         return $this;
     }
@@ -234,11 +234,11 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function handleClientException($ce): void
     {
-        $data = Util::exceptionArr($ce, $this->getStore()->compact() + [
-                'page' => $this->page,
-                'total' => $this->total,
-                'params' => $this->params,
-            ]);
+        $data = Util::exceptionArr($ce, [
+            'page' => $this->page,
+            'total' => $this->total,
+            'params' => $this->params,
+        ]);
 
         $this->msg('api_failed', $data, 'error');
     }
@@ -284,33 +284,29 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function handleException(Exception $e): void
     {
-        $data = Util::exceptionArr($e, $this->getStore()->compact() + [
-                'page' => $this->page,
-                'total' => $this->total,
-                'params' => $this->params,
-            ]);
+        $data = Util::exceptionArr($e, [
+            'page' => $this->page,
+            'total' => $this->total,
+            'params' => $this->params,
+        ]);
 
         $this->msg('failed', $data, 'error');
     }
 
     /**
+     * @param array $data
      * @return void
      */
-    protected function handleFinished(): void
+    protected function handleFinish(array $data = []): void
     {
-        $this->finished = $finished = [
-            'microtime' => microtime(true),
-            'carbon' => now()
-        ];
-
-        $this->msg('finished', compact('finished') + [
+        parent::handleFinish($data + [
             'page' => $this->page,
             'params' => $this->params,
-        ], 'info');
+        ]);
     }
 
     /**
-     * @param Store $store
+     * @return void
      */
     protected function handleLastPageFinished(): void
     {
@@ -320,18 +316,14 @@ class ImportStorePage extends AbstractStoreJob
     }
 
     /**
+     * @param array $data
      * @return void
      */
-    protected function handleStart(): void
+    protected function handleStart(array $data = []): void
     {
-        $this->started = $started = [
-            'microtime' => microtime(true),
-            'carbon' => now()
-        ];
-
-        $this->msg('started', compact('started') + [
+        parent::handleStart($data + [
             'page' => $this->page,
             'params' => $this->params,
-        ], 'info');
+        ]);
     }
 }

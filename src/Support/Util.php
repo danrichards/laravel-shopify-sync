@@ -52,7 +52,7 @@ class Util
      */
     public static function filterOrderImport(array $order_data)
     {
-        return true;
+        return ! empty($order_data['line_items']);
     }
 
     /**
