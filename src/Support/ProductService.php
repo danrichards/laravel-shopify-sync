@@ -269,17 +269,16 @@ class ProductService extends AbstractService
      */
     protected function init(Store $store, array $product_data, Product $product = null)
     {
+        $product_model = config('shopify.products.model');
         $this->product_data = $product_data;
         $this->variants_data = $this->product_data['variants'];
 
         // SANITY CHECK: Command is often queued, check again if the product exists.
         if ($product_data['id'] && empty($product)) {
-            if ($existing = Product::findByStoreProductId($product_data['id'], $store)) {
+            if ($existing = $product_model::findByStoreProductId($product_data['id'], $store)) {
                 $this->product = $product = $existing;
             }
         }
-
-        $product_model = config('shopify.products.model');
 
         $this->product = $product ?: new $product_model;
         $this->imported = $this->product->exists;

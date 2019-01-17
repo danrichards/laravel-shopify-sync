@@ -118,108 +118,13 @@ class Product extends Model
      * @param Store $store
      * @return Product|null
      */
-    public static function findByStoreProductId($product_id, Store $store)
+    public static function findByStoreProductId($product_id, Store $store = null)
     {
-        return Product::whereMorph($store, 'store')
-            ->where('store_product_id', $product_id)
+        return Product::where('store_product_id', $product_id)
+            ->when($store, function(Builder $q, $s) {
+                $q->whereMorph($s, 'store');
+            })
             ->first();
-    }
-
-    /**
-     * @param ShopifyProduct $shopify_product
-     * @param array $attributes
-     * @return Product
-     */
-    public static function createForShopifyProduct(Store $store, ShopifyProduct $shopify_product, array $attributes = [])
-    {
-        $product = static::fillNewForShopifyProduct($store, $shopify_product, $attributes);
-
-        $product->save();
-
-        return $product;
-    }
-
-    /**
-     * @param ShopifyProduct $shopify_product
-     * @param array $attributes
-     * @return Product
-     */
-    public static function fillNewForShopifyProduct(Store $store, ShopifyProduct $shopify_product, array $attributes = [])
-    {
-        return (new static)->fillForShopifyProduct($store, $shopify_product, $attributes);
-    }
-
-    /**
-     * @param Store $store
-     * @param ShopifyProduct $shopify_product
-     * @param array $attributes
-     * @return $this
-     */
-    public function fillForShopifyProduct(Store $store, ShopifyProduct $shopify_product, array $attributes = [])
-    {
-        $data = $store->unmorph('store');
-
-        $data['user_id'] = $store->user_id;
-        $data['store_product_id'] = $shopify_product->getKey();
-
-        $data['api_cache'] = $shopify_product->getAttributes();
-        $data['api_cached_at'] = now();
-
-        $update = $shopify_product->getAttributes();
-
-        $data += array_intersect_key($update, array_fill_keys($updatable, null));
-
-        return $this->fill($attributes + $data);
-    }
-
-    /**
-     * DOES NOT UPDATE VARIANT DATA
-     *
-     * @param ShopifyProduct $shopify_product
-     * @param array $attributes
-     * @return bool
-     */
-    public function updateForShopifyProduct(ShopifyProduct $shopify_product, array $attributes = [])
-    {
-        $attributes += ['synced_at' => now()];
-
-        $this->fillForShopifyProduct($this->store, $shopify_product, $attributes);
-
-        return $this->save();
-    }
-
-    /**
-     * @param ShopifyProduct $shopify_product
-     * @return array
-     * @throws Exception
-     */
-    public function updateVariantsForShopifyProduct(ShopifyProduct $shopify_product)
-    {
-        $store = $this->store;
-
-        $live_ids = collect($shopify_product->variants)->pluck('id')->values()->all();
-        $db_ids = $this->variants()->pluck('store_variant_id')->values()->all();
-        $delete_ids = array_diff($db_ids, $live_ids);
-
-        Variant::whereIn('store_variant_id', $delete_ids)
-            ->get()
-            ->each(function(Variant $v) {
-                $v->delete();
-            });
-
-        foreach ($shopify_product->variants as $variant_arr) {
-            $variant_id = $variant_arr['id'];
-            /** @var Variant $variant */
-            $variant = Variant::findByStoreProductIdVariantId($shopify_product->getKey(), $variant_id, $store);
-            if ($variant) {
-                $variant->updateForShopifyProduct($shopify_product);
-                $updated_ids[] = $variant_id;
-            } else {
-                $delete_ids[] = $variant_id;
-            }
-        }
-
-        return compact('delete_ids', 'updated_ids');
     }
 
     /**

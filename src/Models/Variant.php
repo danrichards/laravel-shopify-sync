@@ -2,8 +2,6 @@
 
 namespace Dan\Shopify\Laravel\Models;
 
-use Dan\Shopify\Models\Product as ShopifyProduct;
-use Dan\Shopify\Models\Variant as ShopifyVariant;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\SoftDeletes;
@@ -95,76 +93,6 @@ class Variant extends Model
     }
 
     /**
-     * @param Store $store
-     * @param ShopifyVariant $shopify_variant
-     * @param array $attributes
-     * @return Variant
-     */
-    public static function createForShopifyVariant(Store $store, ShopifyVariant $shopify_variant, array $attributes = [])
-    {
-        $variant = static::fillForShopifyVariant($store, $shopify_variant, $attributes);
-        $variant->save();
-        return $variant;
-    }
-
-    /**
-     * @param Store $store
-     * @param ShopifyVariant $shopify_variant
-     * @param array $attributes
-     * @return Variant
-     */
-    public static function fillForShopifyVariant(Store $store, ShopifyVariant $shopify_variant, array $attributes = [])
-    {
-        $data = $shopify_variant->getAttributes();
-        $product = Product::findByStoreProductId($shopify_variant->product_id, $store);
-
-        $shopify_fields = array_flip(Variant::$shopify_fields);
-
-        $shopify_data = $attributes + array_intersect_key($data, $shopify_fields)
-            + [
-                'store_variant_id' => $data['id'],
-                'store_product_id' => $data['product_id'],
-                'product_id' => $product->getKey()
-            ];
-
-        return new Variant($shopify_data);
-    }
-
-    /**
-     * @param ShopifyProduct $shopify_product
-     * @param array $attributes
-     * @return bool
-     */
-    public function updateForShopifyProduct(ShopifyProduct $shopify_product, array $attributes = [])
-    {
-        $attributes += ['synced_at' => now()];
-
-        $update = collect($shopify_product->variants)->first(function($v) {
-            return $v['id'] == $this->store_variant_id;
-        });
-        $updatable = array_diff(static::$shopify_fields, static::$shopify_ignore_api_on_update);
-        $data = array_intersect_key($update, array_fill_keys($updatable, null));
-
-        $this->update($data + $attributes);
-
-        return true;
-    }
-
-    /**
-     * @param Store $store
-     * @param ShopifyVariant $shopify_variant
-     * @return Variant|null
-     */
-    public static function findByShopifyVariant(Store $store, ShopifyVariant $shopify_variant)
-    {
-        return self::findByStoreProductIdVariantId(
-            $store_product_id = $shopify_variant->product_id,
-            $store_variant_id = $shopify_variant->getKey(),
-            $store
-        );
-    }
-
-    /**
      * @param int $store_product_id
      * @param int $store_variant_id
      * @param Store|null $store
@@ -174,7 +102,9 @@ class Variant extends Model
     {
         return static::select(['variants.*'])
             ->join('products', 'products.id', '=', 'variants.product_id')
-            ->whereMorph($store, 'store')
+            ->when($store, function(Builder $q, $s) {
+                $q->whereMorph($s, 'store');
+            })
             ->where('variants.store_product_id', $store_product_id)
             ->where('variants.store_variant_id', $store_variant_id)
             ->first();
