@@ -183,7 +183,7 @@ class OrderService extends AbstractService
         } catch (Exception $e) {
             DB::rollBack();
 
-            $order = null;
+            $this->order->exists = false;
 
             $trace = Util::exceptionArr($e);
 
@@ -194,11 +194,13 @@ class OrderService extends AbstractService
             }
         }
 
-        $this->order = $this->order->fresh();
-        $this->order_items = $this->order->order_items;
+        if ($this->order->exists) {
+            $this->order = $this->order->fresh();
+            $this->order_items = $this->order->order_items;
 
-        // White Labeling and Engraving
-        event(new Created($this->order));
+            // White Labeling and Engraving
+            event(new Created($this->order));
+        }
 
         return $this->order;
     }
