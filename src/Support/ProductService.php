@@ -89,7 +89,7 @@ class ProductService extends AbstractService
             }
         }
 
-        if ($this->product->exists) {
+        if (optional($this->product)->exists) {
             event(new Created($this->product));
         }
 

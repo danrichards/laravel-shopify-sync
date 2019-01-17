@@ -183,7 +183,7 @@ class OrderService extends AbstractService
         } catch (Exception $e) {
             DB::rollBack();
 
-            $this->order->exists = false;
+            $this->order = null;
 
             $trace = Util::exceptionArr($e);
 
@@ -194,7 +194,7 @@ class OrderService extends AbstractService
             }
         }
 
-        if ($this->order->exists) {
+        if (optional($this->order)->exists) {
             $this->order = $this->order->fresh();
             $this->order_items = $this->order->order_items;
 
