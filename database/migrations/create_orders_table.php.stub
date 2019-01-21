@@ -91,7 +91,7 @@ class CreateOrdersTable extends Migration
             $table->decimal('subtotal_price', 8, 2)->default(0);
             $table->decimal('total_tax', 8, 2)->default(0);
             $table->decimal('total_discounts', 8, 2)->default(0);
-            $table->integer('total_weight')->default(0); // grams
+            $table->integer('total_weight')->nullable(); // grams
             $table->text('discount_codes')->nullable();
             $table->text('discount_applications')->nullable();
             $table->string('credit_card_number_last4', 4)->nullable();
@@ -129,7 +129,7 @@ class CreateOrdersTable extends Migration
             $table->text('client_details')->nullable();
             $table->string('client_details_browser_ip', 32)->nullable();
             $table->string('client_details_accept_language', 32)->nullable();
-            $table->string('client_details_user_agent', 255)->nullable();
+            $table->text('client_details_user_agent')->nullable();
             $table->string('client_details_session_hash', 255)->nullable();
             $table->unsignedMediumInteger('client_details_browser_width')->nullable();
             $table->unsignedMediumInteger('client_details_browser_height')->nullable();
@@ -142,7 +142,7 @@ class CreateOrdersTable extends Migration
             $table->string('landing_site', 255)->nullable();
             $table->string('landing_site_ref', 255)->nullable();
 
-            $table->string('note', 255)->nullable();
+            $table->text('note', 255)->nullable();
             $table->text('note_attributes')->nullable();
 
             $table->string('webhook_error', 255)->nullable();

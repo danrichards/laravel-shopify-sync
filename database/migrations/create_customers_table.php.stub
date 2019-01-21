@@ -31,7 +31,7 @@ class CreateCustomersTable extends Migration
             $table->unsignedBigInteger('store_last_order_id')->nullable();
             $table->string('admin_graphql_api_id', 64)->nullable();
 
-            $table->string('email', 255);
+            $table->string('email', 255)->nullable();
             $table->string('first_name', 255)->nullable();
             $table->string('last_name', 255)->nullable();
             $table->string('company', 255)->nullable();
@@ -45,18 +45,18 @@ class CreateCustomersTable extends Migration
             $table->string('country_code', 2)->nullable();
             $table->string('country_name', 255)->nullable();
             $table->string('locale')->nullable();
-            $table->tinyInteger('accepts_marketing')->default(1);
+            $table->tinyInteger('accepts_marketing')->nullable();
             $table->text('note')->nullable();
 
             $table->text('tags')->nullable();
             $table->text('default_address')->nullable();
 
             $table->string('currency', 4)->nullable();
-            $table->integer('orders_count')->default(0);
-            $table->decimal('total_spent', 10, 2)->default(0.00);
+            $table->integer('orders_count')->nullable();
+            $table->decimal('total_spent', 10, 2)->nullable();
             $table->string('last_order_name', 19)->nullable();
-            $table->boolean('tax_exempt')->default(0);
-            $table->boolean('verified_email')->default(1);
+            $table->boolean('tax_exempt')->nullable();
+            $table->boolean('verified_email')->nullable();
             $table->string('multipass_identifier')->nullable();
 
             $table->timestamp('store_created_at')->nullable();
