@@ -126,7 +126,7 @@ class CreateOrdersTable extends Migration
             $table->string('source_url', 255)->nullable();
             $table->string('tags', 255)->nullable();
 
-            $table->text('client_details');
+            $table->text('client_details')->nullable();
             $table->string('client_details_browser_ip', 32)->nullable();
             $table->string('client_details_accept_language', 32)->nullable();
             $table->string('client_details_user_agent', 255)->nullable();
