@@ -143,6 +143,10 @@ class OrderService extends AbstractService
         try {
             DB::beginTransaction();
 
+            // If we didn't load customer in init(), load it now.
+            if (! $this->customer->exists) {
+                $this->fillCustomer($this->order_data);
+            }
             $this->customer->save();
 
             $this->fillMap($this->order_data);
@@ -497,7 +501,8 @@ class OrderService extends AbstractService
         } else {
             $this->filtered_line_items_data = $this->getFilteredLineItemsData();
             $this->order_items = collect();
-            $this->customer = $this->fillCustomer($this->order_data);
+            $customer_model = config('shopify.customers.model');
+            $this->customer = new $customer_model;
         }
 
         return $this;
