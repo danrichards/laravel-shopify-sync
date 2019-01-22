@@ -64,6 +64,7 @@ return [
         'log_tests' => env('SHOPIFY_ORDERS_LOG_TESTS', 1),
         'map' => [
             /* REQUIRED */ 'id' => 'store_order_id',
+            /* REQUIRED */ 'customer.id' => 'store_customer_id',
             'user_id' => 'store_user_id',
             'app_id' => 'store_app_id',
             /* REQUIRED */ 'location_id' => 'store_location_id',

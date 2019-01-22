@@ -49,6 +49,9 @@ class OrderService extends AbstractService
     /** @var Customer $customer */
     protected $customer;
 
+    /** @var array $customer_data */
+    protected $customer_data;
+
     /** @var Order|null $order */
     protected $order;
 
@@ -143,11 +146,17 @@ class OrderService extends AbstractService
         try {
             DB::beginTransaction();
 
-            // If we didn't load customer in init(), load it now.
+            // Safely updateOrCreate if we're not sure the customer exists
             if (! $this->customer->exists) {
+                $customer_model = config('shopify.customers.model');
+                $this->customer = $customer_model::updateOrCreate([
+                    // FATAL if no customer id
+                    'store_customer_id' => $this->order_data['customer']['id'],
+                ], $this->getCustomerDataFromOrderData($this->order_data));
+            } else {
                 $this->fillCustomer($this->order_data);
+                $this->customer->save();
             }
-            $this->customer->save();
 
             $this->fillMap($this->order_data);
             $this->order->fill($attributes);
@@ -216,31 +225,24 @@ class OrderService extends AbstractService
      */
     public function fillCustomer(array $order_data, array $attributes = [])
     {
-        $store = $this->getStore();
-        $customer_model = config('shopify.customers.model');
-        $sc_id = array_get($order_data, 'customer.id');
-        $email = array_get($order_data, 'email', array_get($order_data, 'customer_email'));
+        if (is_null($this->customer)) {
+            $store = $this->getStore();
+            $customer_model = config('shopify.customers.model');
+            $sc_id = array_get($order_data, 'customer.id');
+            $email = array_get($order_data, 'email', array_get($order_data, 'customer_email'));
 
-        $c = $customer_model::findByStoreCustomerId($sc_id, $store);
+            $this->customer = $customer_model::findByStoreCustomerId($sc_id, $store);
 
-        if (empty($c) && ! empty($email)) {
-            $c = $customer_model::findByEmail($email, $store);
+            if (empty($this->customer) && ! empty($email)) {
+                $this->customer = $customer_model::findByEmail($email, $store);
+            }
+
+            if (empty($this->customer)) {
+                $this->customer = new $customer_model;
+            }
         }
 
-        if (empty($c)) {
-            $c = new $customer_model;
-        }
-
-        $this->customer = $c;
-
-        $map = config('shopify.customers.map_from_orders');
-        $model = $c->exists ? $c : config('shopify.customers.model');
-        $mapped_data = $this->util()::mapData($order_data, $map, $model);
-
-        $data = $attributes
-            + $mapped_data
-            + $this->getStore()->unmorph('store')
-            + ['synced_at' => new Carbon('now')];
+        $data = $this->getCustomerDataFromOrderData($order_data, $attributes);
 
         return $this->customer->fill($data);
     }
@@ -330,6 +332,25 @@ class OrderService extends AbstractService
     public function getCustomer(): Customer
     {
         return $this->customer;
+    }
+
+    /**
+     * @param array $order_data
+     * @param array $attributes
+     * @return array
+     */
+    protected function getCustomerDataFromOrderData(array $order_data, array $attributes = []): array
+    {
+        $map = config('shopify.customers.map_from_orders');
+        $model = $this->customer->exists
+            ? $this->customer
+            : config('shopify.customers.model');
+        $mapped_data = $this->util()::mapData($order_data, $map, $model);
+
+        return $attributes
+            + $mapped_data
+            + $this->getStore()->unmorph('store')
+            + ['synced_at' => new Carbon('now')];
     }
 
     /**
@@ -503,6 +524,7 @@ class OrderService extends AbstractService
             $this->order_items = collect();
             $customer_model = config('shopify.customers.model');
             $this->customer = new $customer_model;
+            $this->customer_data = $this->getCustomerDataFromOrderData($this->order_data);
         }
 
         return $this;

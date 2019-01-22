@@ -29,6 +29,7 @@ class CreateOrdersTable extends Migration
             $table->integer('store_id');
 
             $table->unsignedBigInteger('store_order_id');
+            $table->unsignedBigInteger('store_customer_id');
             $table->unsignedBigInteger('store_user_id')->nullable();
             $table->unsignedBigInteger('store_app_id')->nullable();
             $table->string('admin_graphql_api_id', 64)->nullable();
@@ -160,8 +161,9 @@ class CreateOrdersTable extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->unique(['store_type', 'store_id', 'store_order_id'], 'orders_store_type_store_id_store_order_id');
-            $table->index(['store_type', 'store_id'], 'orders_store_type_store_id_index');
+            $table->unique(['store_type', 'store_id', 'store_order_id'], 'orders_store_morph_store_order_id_unique');
+            $table->index(['store_type', 'store_id', 'store_customer_id'], 'orders_store_morph_store_customer_id_index');
+            $table->index(['store_type', 'store_id'], 'orders_store_morph_index');
             $table->index('customer_id', 'orders_customer_id_index');
             $table->index('store_order_id', 'soi');
             $table->index('number', 'orders_number_index');
