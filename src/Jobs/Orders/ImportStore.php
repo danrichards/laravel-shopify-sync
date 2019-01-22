@@ -42,7 +42,7 @@ class ImportStore extends AbstractStoreJob
         parent::__construct($store);
 
         $params['created_at_min'] = $this->getCreatedAtMin();
-        $this->params = $params + $this->getDefaultParams();
+        $this->params = array_filter($params) + $this->getDefaultParams();
         $this->connection = $connection;
         $this->dryrun = $dryrun;
     }

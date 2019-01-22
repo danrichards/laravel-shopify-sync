@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ImportOrders extends AbstractCommand
 {
     /** @var string $signature */
-    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--status=any} {--created_at_min=} {--limit=} {--store_ids=any}';
+    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--status=any} {--order=created_at asc} {--created_at_min=last} {--limit=} {--store_ids=any}';
 
     /** @var string $description */
     protected $description = 'Verify and sync orders.';
@@ -38,7 +38,8 @@ class ImportOrders extends AbstractCommand
 
         $params = [
             'created_at_min' => $this->option('created_at_min'),
-            'limit' => $this->option('limit'),
+            'limit' => $this->option('limit') ?? config('shopify.sync.limit'),
+            'order' => $this->option('order'),
             'status' => $status = $this->option('status'),
         ];
 
