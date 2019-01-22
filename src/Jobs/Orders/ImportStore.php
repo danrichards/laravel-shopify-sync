@@ -41,9 +41,22 @@ class ImportStore extends AbstractStoreJob
     {
         parent::__construct($store);
 
-        $this->params = $params;
+        $params['created_at_min'] = $this->getCreatedAtMin();
+        $this->params = $params + $this->getDefaultParams();
         $this->connection = $connection;
         $this->dryrun = $dryrun;
+    }
+
+    /**
+     * @return array
+     */
+    public function getDefaultParams()
+    {
+        return [
+            'limit' => config('shopify.sync.limit'),
+            'order' => 'created_at asc',
+            'status' => 'any'
+        ];
     }
 
     /**
@@ -54,11 +67,8 @@ class ImportStore extends AbstractStoreJob
         ini_set('max_execution_time', config('shopify.sync.max_execution_time'));
 
         $store = $this->store;
-        $limit = $this->params['limit'] ?? config('shopify.sync.limit');
-        $order = $this->params['order'] ?? 'created_at asc';
+        $params = $this->params;
         $connection = $this->connection;
-
-        $created_at_min = $this->getCreatedAtMin();
 
         if (static::hasLockFor($store)) {
             $this->msg('is_locked', [], 'warning');
@@ -70,11 +80,10 @@ class ImportStore extends AbstractStoreJob
 
             $total = $this->getApiClient()
                 ->orders
-                ->get(compact('created_at_min', 'order'), 'count')
+                ->get($this->params, 'count')
                 ['count'];
 
-            $pages = range(1, ceil($total / $limit));
-            $params = compact('order', 'limit', 'created_at_min');
+            $pages = range(1, ceil($total / $params['limit']));
 
             $page_job = new ImportStorePage($store, $pages, $params, $connection, $this->dryrun);
 
@@ -91,33 +100,6 @@ class ImportStore extends AbstractStoreJob
         }
 
         return $this;
-    }
-
-    /**
-     * @param Store $store
-     * @return bool
-     */
-    public static function hasLockFor(Store $store)
-    {
-        return boolval(Cache::get(__CLASS__.'|'.$store->getKey()));
-    }
-
-    /**
-     * @param Store $store
-     * @param int $minutes
-     */
-    public static function lock(Store $store, $minutes = null)
-    {
-        $minutes = $minutes ?: config('shopify.sync.lock');
-        Cache::put(__CLASS__.'|'.$store->getKey(), $lock = true, $minutes);
-    }
-
-    /**
-     * @param Store $store
-     */
-    public static function unlock(Store $store)
-    {
-        Cache::forget(__CLASS__.'|'.$store->getKey());
     }
 
     /**
