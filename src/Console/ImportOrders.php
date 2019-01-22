@@ -2,9 +2,9 @@
 
 namespace Dan\Shopify\Laravel\Console;
 
-use Carbon\Carbon;
 use Dan\Shopify\Laravel\Jobs\Orders\ImportStore;
 use Dan\Shopify\Laravel\Models\Store;
+use Dan\Shopify\Models\Order as ShopifyOrder;
 use Exception;
 use Illuminate\Database\Eloquent\Builder;
 use Log;
@@ -16,7 +16,7 @@ use Symfony\Component\Console\Output\OutputInterface;
 class ImportOrders extends AbstractCommand
 {
     /** @var string $signature */
-    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--created_at_min=} {--limit=} {--store_ids=any}';
+    protected $signature = 'shopify:import:orders {--dryrun} {--connection=sync} {--status=any} {--created_at_min=} {--limit=} {--store_ids=any}';
 
     /** @var string $description */
     protected $description = 'Verify and sync orders.';
@@ -38,8 +38,14 @@ class ImportOrders extends AbstractCommand
 
         $params = [
             'created_at_min' => $this->option('created_at_min'),
-            'limit' => $this->option('limit')
+            'limit' => $this->option('limit'),
+            'status' => $status = $this->option('status'),
         ];
+
+        if (! in_array($status, ShopifyOrder::$filter_statuses)) {
+            $this->error('Please specify a valid status, '.implode(', ', ShopifyOrder::$filter_statuses).'.');
+            return;
+        }
 
         $this->logCount();
 
