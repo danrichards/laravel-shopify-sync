@@ -140,7 +140,6 @@ class ImportStore extends AbstractStoreJob
         $this->msg($msg, $data, 'emergency');
     }
 
-
     /**
      * @return string
      */

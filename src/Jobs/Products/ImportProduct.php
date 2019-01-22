@@ -9,6 +9,7 @@ use Dan\Shopify\Laravel\Models\Store;
 use Dan\Shopify\Laravel\Support\ProductService;
 use Dan\Shopify\Laravel\Support\Util;
 use Exception;
+use Illuminate\Database\QueryException;
 
 /**
  * Class ImportProduct
@@ -59,6 +60,31 @@ class ImportProduct extends AbstractStoreJob
                     throw $e;
                 }
             }
+        }
+    }
+
+    /**
+     * @param Exception $e
+     */
+    public function failed(Exception $e)
+    {
+        switch (true) {
+            case $e instanceof QueryException:
+                $msg = "query_failure";
+                $data = [
+                    'msg' => $e->getMessage(),
+                    'trace_first' => array_first($e->getTrace())
+                ];
+                if (str_contains($msg, 'Duplicate entry')) {
+                    $this->job->delete();
+                }
+
+                return $this->msg($msg, $data, 'warning');
+            default:
+                $data = Util::exceptionArr($e);
+                $msg = "queue_job_failed";
+
+                return $this->msg($msg, $data, 'emergency');
         }
     }
 
