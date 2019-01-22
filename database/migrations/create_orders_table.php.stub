@@ -29,7 +29,7 @@ class CreateOrdersTable extends Migration
             $table->integer('store_id');
 
             $table->unsignedBigInteger('store_order_id');
-            $table->unsignedBigInteger('store_customer_id');
+            $table->unsignedBigInteger('store_customer_id')->nullable();
             $table->unsignedBigInteger('store_user_id')->nullable();
             $table->unsignedBigInteger('store_app_id')->nullable();
             $table->string('admin_graphql_api_id', 64)->nullable();

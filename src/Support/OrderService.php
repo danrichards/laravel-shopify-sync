@@ -151,7 +151,7 @@ class OrderService extends AbstractService
                 $customer_model = config('shopify.customers.model');
                 $this->customer = $customer_model::updateOrCreate([
                     // FATAL if no customer id
-                    'store_customer_id' => $this->order_data['customer']['id'],
+                    'store_customer_id' => array_get($this->order_data, 'customer.id'),
                 ], $this->getCustomerDataFromOrderData($this->order_data));
             } else {
                 $this->fillCustomer($this->order_data);
