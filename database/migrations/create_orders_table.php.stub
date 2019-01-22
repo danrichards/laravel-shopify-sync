@@ -129,7 +129,7 @@ class CreateOrdersTable extends Migration
 
             $table->text('client_details')->nullable();
             $table->string('client_details_browser_ip', 32)->nullable();
-            $table->string('client_details_accept_language', 32)->nullable();
+            $table->string('client_details_accept_language', 255)->nullable();
             $table->text('client_details_user_agent')->nullable();
             $table->string('client_details_session_hash', 255)->nullable();
             $table->unsignedMediumInteger('client_details_browser_width')->nullable();
@@ -139,9 +139,9 @@ class CreateOrdersTable extends Migration
             $table->boolean('buyer_accepts_marketing')->nullable();
 
             $table->string('reference', 32)->nullable();
-            $table->string('referring_site', 255)->nullable();
-            $table->string('landing_site', 255)->nullable();
-            $table->string('landing_site_ref', 255)->nullable();
+            $table->text('referring_site')->nullable();
+            $table->text('landing_site')->nullable();
+            $table->text('landing_site_ref')->nullable();
 
             $table->text('note', 255)->nullable();
             $table->text('note_attributes')->nullable();
