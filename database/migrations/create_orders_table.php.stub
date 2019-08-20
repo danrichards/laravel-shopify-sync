@@ -164,6 +164,7 @@ class CreateOrdersTable extends Migration
             $table->unique(['store_type', 'store_id', 'store_order_id'], 'orders_store_morph_store_order_id_unique');
             $table->index(['store_type', 'store_id', 'store_customer_id'], 'orders_store_morph_store_customer_id_index');
             $table->index(['store_type', 'store_id'], 'orders_store_morph_index');
+            $table->index('store_user_id', 'orders_store_user_id_index');
             $table->index('customer_id', 'orders_customer_id_index');
             $table->index('store_order_id', 'soi');
             $table->index('number', 'orders_number_index');

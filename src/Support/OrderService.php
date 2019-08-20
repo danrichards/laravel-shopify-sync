@@ -302,7 +302,10 @@ class OrderService extends AbstractService
         $data = $mapped_data
             + $this->getStore()->unmorph('store')
             + $this->customer->compact('customer')
-            + ['synced_at' => new Carbon('now')];
+            + [
+                'user_id' => $this->getStore()->user_id,
+                'synced_at' => new Carbon('now')
+            ];
 
         return $this->order->fill($data);
     }
