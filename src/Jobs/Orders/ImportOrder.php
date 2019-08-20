@@ -29,9 +29,7 @@ class ImportOrder extends AbstractStoreJob
     {
         parent::__construct($store);
 
-        $this->order_data = $order_data + [
-            'user_id' => $this->store->user_id
-        ];
+        $this->order_data = $order_data;
     }
 
     /**
