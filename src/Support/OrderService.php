@@ -303,7 +303,7 @@ class OrderService extends AbstractService
             + $this->getStore()->unmorph('store')
             + $this->customer->compact('customer')
             + [
-                'user_id' => $this->getStore()->user_id,
+                'store_user_id' => $this->getStore()->user_id,
                 'synced_at' => new Carbon('now')
             ];
 
