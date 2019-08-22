@@ -302,10 +302,7 @@ class OrderService extends AbstractService
         $data = $mapped_data
             + $this->getStore()->unmorph('store')
             + $this->customer->compact('customer')
-            + [
-                'store_user_id' => $this->getStore()->user_id,
-                'synced_at' => new Carbon('now')
-            ];
+            + ['synced_at' => new Carbon('now')];
 
         return $this->order->fill($data);
     }
@@ -503,7 +500,7 @@ class OrderService extends AbstractService
      */
     protected function init(Store $store, array $order_data = [], Order $order = null)
     {
-        $this->order_data = $order_data;
+        $this->order_data = ['user_id' => $store->user_id] + $order_data;
         $order_model = config('shopify.orders.model');
 
         // SANITY CHECK: Command is often queued, check again if the order exists.
