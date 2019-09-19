@@ -14,6 +14,7 @@ use DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
+use Illuminate\Support\Str;
 
 /**
  * Class OrderService
@@ -72,6 +73,11 @@ class OrderService extends AbstractService
 
     /** @var bool $updated */
     protected $updated;
+
+    /** @var array $order_fields_max_length */
+    protected $order_fields_max_length = [
+        'client_details_browser_ip' => 32
+    ];
 
     /**
      * ShopifyOrderService constructor.
@@ -298,6 +304,13 @@ class OrderService extends AbstractService
         $map = config('shopify.orders.map');
         $model = $this->order ?: config('shopify.orders.model');
         $mapped_data = $this->util()::mapData($order_data, $map, $model);
+
+        // DB field max size
+        foreach($this->order_fields_max_length as $field => $max_length) {
+            if (strlen($mapped_data[$field]) > $max_length) {
+                $mapped_data[$field] = substr($mapped_data[$field], 0, $max_length - 3) . '...';
+            }
+        }
 
         $data = $mapped_data
             + $this->getStore()->unmorph('store')
