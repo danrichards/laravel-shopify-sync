@@ -2,19 +2,18 @@
 
 namespace Dan\Shopify\Laravel\Support;
 
+use BadMethodCallException;
+use Carbon\Carbon;
 use Dan\Shopify\Laravel\Events\Orders\Created;
 use Dan\Shopify\Laravel\Models\Customer;
 use Dan\Shopify\Laravel\Models\Order;
 use Dan\Shopify\Laravel\Models\OrderItem;
 use Dan\Shopify\Laravel\Models\Store;
 use Dan\Shopify\Models\Order as ShopifyOrder;
-use BadMethodCallException;
-use Carbon\Carbon;
-use DB;
+use \DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
-use Illuminate\Support\Str;
 
 /**
  * Class OrderService
