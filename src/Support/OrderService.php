@@ -203,7 +203,7 @@ class OrderService extends AbstractService
 
             $this->order = null;
 
-            $trace = Util::exceptionArr($e);
+            $trace = Util::exceptionArr($e, ['order_data' => $this->order_data]);
 
             $this->msg('create', compact('trace'), 'emergency');
 
