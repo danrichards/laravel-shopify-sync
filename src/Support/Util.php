@@ -172,6 +172,21 @@ class Util
     }
 
     /**
+     * @param array $data
+     * @param array $max_lengths
+     * @return array
+     */
+    public static function truncateFields(array $data, array $max_lengths)
+    {
+        foreach ($max_lengths as $field => $max_length) {
+            if (strlen($data[$field]) > $max_length) {
+                $data[$field] = substr($data[$field], 0, $max_length - 3) . '...';
+            }
+        }
+        return $data;
+    }
+
+    /**
      * @param array $name_values
      * @param array $dictionary
      * @return array

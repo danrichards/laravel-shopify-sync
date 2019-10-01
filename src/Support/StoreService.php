@@ -51,7 +51,9 @@ class StoreService extends AbstractService
         $mapped_data = $this->util()->mapData(
             $data = $store_data,
             $map = config('shopify.stores.map'),
-            $model = $this->store->exists ? $this->store : config('shopify.products.model'));
+            $model = $this->store->exists ? $this->store : config('shopify.stores.model'));
+
+        $mapped_data = $this->util()::truncateFields($mapped_data, config('shopify.stores.fields_max_length'));
 
         return $this->store->fill($mapped_data);
     }
