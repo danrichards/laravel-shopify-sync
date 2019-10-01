@@ -175,6 +175,10 @@ return [
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
+        'fields_max_length' => [
+            'client_details_browser_ip' => 32,
+            'shipping_phone' => 32
+        ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
         'refund_filter' => 'Dan\Shopify\Laravel\Support\Util::filterOrderRefund',
@@ -343,6 +347,10 @@ return [
             'setup_required' => 'setup_required',
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
+        ],
+        'fields_max_length' => [
+            'plan_display_name' => 16,
+            'primary_locale' => 8
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Store::class,

@@ -73,12 +73,6 @@ class OrderService extends AbstractService
     /** @var bool $updated */
     protected $updated;
 
-    /** @var array $order_fields_max_length */
-    protected $order_fields_max_length = [
-        'client_details_browser_ip' => 32,
-        'shipping_phone' => 32
-    ];
-
     /**
      * ShopifyOrderService constructor.
      *
@@ -305,14 +299,14 @@ class OrderService extends AbstractService
         $model = $this->order ?: config('shopify.orders.model');
         $mapped_data = $this->util()::mapData($order_data, $map, $model);
 
-        $mapped_data = $this->truncateFields($mapped_data, $this->order_fields_max_length);
-
         $data = $this->getStore()->unmorph('store')
             + $this->customer->compact('customer')
             + [
                 'store_user_id' => $this->getStore()->user_id,
                 'synced_at' => new Carbon('now')
             ] + $mapped_data;
+
+        $data = $this->util()::truncateFields($data, config('shopify.orders.fields_max_length'));
 
         return $this->order->fill($data);
     }
@@ -762,18 +756,4 @@ class OrderService extends AbstractService
 //
 //        return $this;
 //    }
-    /**
-     * @param array $mapped_data
-     * @param array $fields_max_lengths
-     * @return array
-     */
-    protected function truncateFields(array $mapped_data, array $fields_max_lengths)
-    {
-        foreach ($fields_max_lengths as $field => $max_length) {
-            if (strlen($mapped_data[$field]) > $max_length) {
-                $mapped_data[$field] = substr($mapped_data[$field], 0, $max_length - 3) . '...';
-            }
-        }
-        return $mapped_data;
-    }
 }
