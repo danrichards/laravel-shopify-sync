@@ -177,7 +177,9 @@ return [
         ],
         'fields_max_length' => [
             'client_details_browser_ip' => 32,
-            'shipping_phone' => 32
+            'shipping_phone' => 32,
+            'shipping_address1' => 128,
+            'shipping_address2' => 128
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
