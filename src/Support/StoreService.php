@@ -82,7 +82,7 @@ class StoreService extends AbstractService
 
             $trace = $this->util()::exceptionArr($e);
 
-            $this->msg($verb, compact('trace'), 'emergency');
+            $this->msg($verb, compact('trace', 'attributes'), 'emergency');
 
             if (config('shopify.sync.throw_processing_exceptions')) {
                 throw $e;
