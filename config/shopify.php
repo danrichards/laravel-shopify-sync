@@ -179,7 +179,8 @@ return [
             'client_details_browser_ip' => 32,
             'shipping_phone' => 32,
             'shipping_address1' => 128,
-            'shipping_address2' => 128
+            'shipping_address2' => 128,
+            'gateway' => 64,
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
@@ -351,6 +352,7 @@ return [
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
         ],
         'fields_max_length' => [
+            'plan_name' => 32,
             'plan_display_name' => 16,
             'primary_locale' => 8
         ],
