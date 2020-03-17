@@ -180,7 +180,7 @@ return [
             'shipping_phone' => 32,
             'shipping_address1' => 128,
             'shipping_address2' => 128,
-            'gateway' => 64,
+            'gateway' => 32,
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
@@ -251,6 +251,9 @@ return [
             /* REQUIRED */ 'published_at' => 'published_at',
             /* REQUIRED */ 'created_at' => 'store_created_at',
             /* REQUIRED */ 'updated_at' => 'store_updated_at',
+        ],
+        'fields_max_length' => [
+            'images' => 65535,
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Product::class,

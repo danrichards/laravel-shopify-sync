@@ -127,6 +127,8 @@ class ProductService extends AbstractService
             + $this->store->unmorph('store')
             + ['synced_at' => new Carbon('now')];
 
+        $data = $this->util()::truncateFields($data, config('shopify.products.fields_max_length', []));
+
         $this->product->fill($data);
 
         return $this->product;
