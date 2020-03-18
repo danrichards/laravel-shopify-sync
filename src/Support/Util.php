@@ -183,6 +183,7 @@ class Util
                 $data[$field] = substr($data[$field], 0, $max_length - 3) . '...';
             }
         }
+
         return $data;
     }
 

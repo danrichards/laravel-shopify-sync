@@ -306,7 +306,7 @@ class OrderService extends AbstractService
                 'synced_at' => new Carbon('now')
             ] + $mapped_data;
 
-        $data = $this->util()::truncateFields($data, config('shopify.orders.fields_max_length'));
+        $data = $this->util()::truncateFields($data, config('shopify.orders.fields_max_length', []));
 
         return $this->order->fill($data);
     }
