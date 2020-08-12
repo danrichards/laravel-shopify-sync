@@ -51,6 +51,12 @@ class ImportStorePage extends AbstractStoreJob
     /** @var Store $store */
     protected $store;
 
+    /** @var array */
+    protected $cursors;
+
+    /** @var string $connection */
+    protected $connection;
+
     /**
      * ImportStorePage constructor.
      *
@@ -59,8 +65,9 @@ class ImportStorePage extends AbstractStoreJob
      * @param array $params
      * @param string $connection
      * @param bool $dryrun
+     * @param array $cursors
      */
-    public function __construct(Store $store, array $pages = [], $params = [], $connection = 'sync', $dryrun = false)
+    public function __construct(Store $store, array $pages = [], $params = [], $connection = 'sync', $dryrun = false, $cursors = [])
     {
         parent::__construct($store);
 
@@ -74,6 +81,7 @@ class ImportStorePage extends AbstractStoreJob
         $this->pages = $pages;
         $this->connection = $connection;
         $this->dryrun = $dryrun;
+        $this->cursors = $cursors;
 
         $this->page = array_shift($this->pages);
         $this->total = $this->page + count($this->pages);
@@ -180,10 +188,17 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function getProductsFromApi(): BaseCollection
     {
+        $api2 = $this->getApiClient();
+        $api2->cursors = $this->cursors;
+
         // Iterate pages of products from Shopify
-        $api_products = $this->getApiClient()
-            ->products
-            ->get($this->params + ['page' => $this->page]);
+        if (! empty($api2->cursors)) {
+            $api_products = $api2->products->next(['limit' => $this->params['limit']]);
+        } else {
+            $api_products = $api2->products->next($params);
+        }
+
+        $this->cursors = $api2->cursors;
 
         $this->msg('received', ['count' => count($api_products)], 'info');
 
@@ -283,7 +298,7 @@ class ImportStorePage extends AbstractStoreJob
         $connection = $this->connection;
 
         sleep(config('shopify.sync.sleep_between_page_requests'));
-        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun);
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun, $this->cursors);
         $connection == 'sync'
             ? dispatch($next_page)->onConnection($connection)
             : dispatch_now($next_page);
