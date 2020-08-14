@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "80871e6010379ea387c3530ea2c329eb",
+    "content-hash": "5cd965f69068ca4abf2b8f35cf92c6aa",
     "packages": [
         {
             "name": "dan/laravel-more",
@@ -49,16 +49,16 @@
         },
         {
             "name": "dan/shopify",
-            "version": "v2.1.10",
+            "version": "v2.9.5",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danrichards/shopify.git",
-                "reference": "f753bc034969da53d0746888ffe43aaadb3b8a5e"
+                "reference": "f44a786e2ad15fdc248b645e5b56e9a9e39a4c76"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/danrichards/shopify/zipball/f753bc034969da53d0746888ffe43aaadb3b8a5e",
-                "reference": "f753bc034969da53d0746888ffe43aaadb3b8a5e",
+                "url": "https://api.github.com/repos/danrichards/shopify/zipball/f44a786e2ad15fdc248b645e5b56e9a9e39a4c76",
+                "reference": "f44a786e2ad15fdc248b645e5b56e9a9e39a4c76",
                 "shasum": ""
             },
             "require": {
@@ -70,6 +70,16 @@
                 "phpunit/phpunit": "^5.3"
             },
             "type": "project",
+            "extra": {
+                "laravel": {
+                    "providers": [
+                        "Dan\\Shopify\\Integrations\\Laravel\\ShopifyServiceProvider"
+                    ],
+                    "aliases": {
+                        "Shopify": "Dan\\Shopify\\Integrations\\Laravel\\ShopifyFacade"
+                    }
+                }
+            },
             "autoload": {
                 "psr-4": {
                     "Dan\\Shopify\\": "src/"
@@ -92,7 +102,7 @@
                 "shopify",
                 "webhooks"
             ],
-            "time": "2019-01-04T21:02:51+00:00"
+            "time": "2020-08-03T16:15:56+00:00"
         },
         {
             "name": "doctrine/inflector",

@@ -51,6 +51,9 @@ class ImportStorePage extends AbstractStoreJob
     /** @var Store $store */
     protected $store;
 
+    /** @var array */
+    protected $cursors;
+
     /**
      * ImportStorePage constructor.
      *
@@ -59,8 +62,9 @@ class ImportStorePage extends AbstractStoreJob
      * @param array $params
      * @param string $connection
      * @param bool $dryrun
+     * @param array $cursors
      */
-    public function __construct(Store $store, array $pages = [], $params = [], $connection = 'sync', $dryrun = false)
+    public function __construct(Store $store, array $pages = [], $params = [], $connection = 'sync', $dryrun = false, $cursors = [])
     {
         parent::__construct($store);
 
@@ -74,6 +78,7 @@ class ImportStorePage extends AbstractStoreJob
         $this->pages = $pages;
         $this->connection = $connection;
         $this->dryrun = $dryrun;
+        $this->cursors = $cursors;
 
         $this->page = array_shift($this->pages);
         $this->total = $this->page + count($this->pages);
@@ -180,10 +185,17 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function getProductsFromApi(): BaseCollection
     {
+        $api2 = $this->getApiClient();
+        $api2->cursors = $this->cursors;
+
         // Iterate pages of products from Shopify
-        $api_products = $this->getApiClient()
-            ->products
-            ->get($this->params + ['page' => $this->page]);
+        if (! empty($api2->cursors)) {
+            $api_products = $api2->products->next(['limit' => $this->params['limit']]);
+        } else {
+            $api_products = $api2->products->next($this->params);
+        }
+
+        $this->cursors = $api2->cursors;
 
         $this->msg('received', ['count' => count($api_products)], 'info');
 
@@ -270,9 +282,12 @@ class ImportStorePage extends AbstractStoreJob
     {
         $job = new ImportProduct($this->getStore(), $api_product);
 
-        $this->connection == 'sync'
-            ? dispatch_now($job)
-            : dispatch($job)->onConnection($this->connection);
+        if ($this->dryrun) {
+            $this->msg("product:{$api_product['id']}:dryrun", [], 'info');
+            return;
+        }
+
+        dispatch($job)->onConnection($this->connection);
     }
 
     /**
@@ -280,13 +295,9 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function handleDispatchNextPage(): void
     {
-        $connection = $this->connection;
-
         sleep(config('shopify.sync.sleep_between_page_requests'));
-        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun);
-        $connection == 'sync'
-            ? dispatch($next_page)->onConnection($connection)
-            : dispatch_now($next_page);
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $this->connection, $this->dryrun, $this->cursors);
+        dispatch($next_page)->onConnection($this->connection);
     }
 
     /**
