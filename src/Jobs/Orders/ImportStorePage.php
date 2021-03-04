@@ -12,6 +12,7 @@ use DB;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
 
 /**
@@ -176,13 +177,21 @@ class ImportStorePage extends AbstractStoreJob
     /**
      * @return BaseCollection
      * @throws \Dan\Shopify\Exceptions\InvalidOrMissingEndpointException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function getOrdersFromApi(): BaseCollection
     {
         // Iterate pages of orders from Shopify
-        $api_orders = $this->getApiClient()
-            ->orders
-            ->get($this->params + ['page' => $this->page]);
+        $api = $this->getApiClient();
+
+        $params = isset($this->params['page_info'])
+            ? Arr::only($this->params, ['limit', 'page_info'])
+            : $this->params;
+
+        $api_orders = $api->orders->get($params);
+
+        // set next page info
+        $this->params['page_info'] = $api->cursors['next'] ?? null;
 
         $this->msg('received', ['count' => count($api_orders)], 'info');
 
@@ -222,7 +231,7 @@ class ImportStorePage extends AbstractStoreJob
             $this->handleCurrentPageFinished($last_order_import_at);
 
             // Is this the last page / product?
-            if (! $api_orders->count() || empty($this->pages)) {
+            if (empty($this->params['page_info'])) {
                 $this->handleLastPageFinished();
             } else {
                 $this->handleDispatchNextPage();
