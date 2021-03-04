@@ -279,9 +279,12 @@ class ImportStorePage extends AbstractStoreJob
     {
         $job = new ImportProduct($this->getStore(), $api_product);
 
-        $this->connection == 'sync'
-            ? dispatch_now($job)
-            : dispatch($job)->onConnection($this->connection);
+        if ($this->dryrun) {
+            $this->msg("product:{$api_product['id']}:dryrun", [], 'info');
+            return;
+        }
+
+        dispatch($job)->onConnection($this->connection);
     }
 
     /**
@@ -289,13 +292,9 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function handleDispatchNextPage(): void
     {
-        $connection = $this->connection;
-
         sleep(config('shopify.sync.sleep_between_page_requests'));
-        $next_page = new static($this->getStore(), $this->pages, $this->params, $connection, $this->dryrun);
-        $connection == 'sync'
-            ? dispatch($next_page)->onConnection($connection)
-            : dispatch_now($next_page);
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $this->connection, $this->dryrun, $this->cursors);
+        dispatch($next_page)->onConnection($this->connection);
     }
 
     /**
