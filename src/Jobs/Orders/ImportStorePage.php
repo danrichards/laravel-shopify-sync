@@ -12,6 +12,7 @@ use DB;
 use Exception;
 use GuzzleHttp\Exception\ClientException;
 use Illuminate\Queue\MaxAttemptsExceededException;
+use Illuminate\Support\Arr;
 use Illuminate\Support\Collection as BaseCollection;
 
 /**
@@ -52,8 +53,8 @@ class ImportStorePage extends AbstractStoreJob
     /** @var bool $filter_existing */
     protected $filter_existing;
 
-    /** @var array $cursors */
-    protected $cursors;
+    /** @var string */
+    protected $connection;
 
     /**
      * ImportStorePage constructor.
@@ -63,9 +64,8 @@ class ImportStorePage extends AbstractStoreJob
      * @param array $params
      * @param string $connection
      * @param bool $dryrun
-     * @param array $cursors
      */
-    public function __construct(Store $store, array $pages = [1], $params = [], $connection = 'sync', $dryrun = false, $cursors = [])
+    public function __construct(Store $store, array $pages = [1], $params = [], $connection = 'sync', $dryrun = false)
     {
         parent::__construct($store);
 
@@ -73,7 +73,6 @@ class ImportStorePage extends AbstractStoreJob
         $this->pages = $pages;
         $this->connection = $connection;
         $this->dryrun = $dryrun;
-        $this->cursors = $cursors;
 
         $this->page = array_shift($this->pages);
         $this->total = $this->page + count($this->pages);
@@ -181,20 +180,21 @@ class ImportStorePage extends AbstractStoreJob
     /**
      * @return BaseCollection
      * @throws \Dan\Shopify\Exceptions\InvalidOrMissingEndpointException
+     * @throws \GuzzleHttp\Exception\GuzzleException
      */
     protected function getOrdersFromApi(): BaseCollection
     {
-        $api2 = $this->getApiClient();
-        $api2->cursors = $this->cursors;
-
         // Iterate pages of orders from Shopify
-        if (! empty($api2->cursors)) {
-            $api_orders = $api2->orders->next(['limit' => $this->params['limit']]);
-        } else {
-            $api_orders = $api2->orders->next($this->params);
-        }
+        $api = $this->getApiClient();
 
-        $this->cursors = $api2->cursors;
+        $params = isset($this->params['page_info'])
+            ? Arr::only($this->params, ['limit', 'page_info'])
+            : $this->params;
+
+        $api_orders = $api->orders->get($params);
+
+        // set next page info
+        $this->params['page_info'] = $api->cursors['next'] ?? null;
 
         $this->msg('received', ['count' => count($api_orders)], 'info');
 
@@ -234,7 +234,7 @@ class ImportStorePage extends AbstractStoreJob
             $this->handleCurrentPageFinished($last_order_import_at);
 
             // Is this the last page / product?
-            if (! $api_orders->count() || empty($this->pages)) {
+            if (empty($this->params['page_info'])) {
                 $this->handleLastPageFinished();
             } else {
                 $this->handleDispatchNextPage();
