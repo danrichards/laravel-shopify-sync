@@ -52,6 +52,9 @@ class ImportStorePage extends AbstractStoreJob
     /** @var Store $store */
     protected $store;
 
+    /** @var string */
+    public $connection;
+
     /**
      * ImportStorePage constructor.
      *
