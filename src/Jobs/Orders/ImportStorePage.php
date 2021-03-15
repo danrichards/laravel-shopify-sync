@@ -53,7 +53,7 @@ class ImportStorePage extends AbstractStoreJob
     protected $filter_existing;
 
     /** @var array $cursors */
-    protected $cursors;
+    public $cursors;
 
     /**
      * ImportStorePage constructor.
