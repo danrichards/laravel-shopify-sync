@@ -52,6 +52,9 @@ class ImportStorePage extends AbstractStoreJob
     /** @var Store $store */
     protected $store;
 
+    /** @var string */
+    public $connection;
+
     /**
      * ImportStorePage constructor.
      *
@@ -293,7 +296,7 @@ class ImportStorePage extends AbstractStoreJob
     protected function handleDispatchNextPage(): void
     {
         sleep(config('shopify.sync.sleep_between_page_requests'));
-        $next_page = new static($this->getStore(), $this->pages, $this->params, $this->connection, $this->dryrun, $this->cursors);
+        $next_page = new static($this->getStore(), $this->pages, $this->params, $this->connection, $this->dryrun);
         dispatch($next_page)->onConnection($this->connection);
     }
 
