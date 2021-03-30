@@ -4,7 +4,7 @@
         "Read more about it at https://getcomposer.org/doc/01-basic-usage.md#installing-dependencies",
         "This file is @generated automatically"
     ],
-    "content-hash": "5c90774eb253ff9245df426a2e946abf",
+    "content-hash": "608b89f14bd73c0bbd33b4836a82d896",
     "packages": [
         {
             "name": "dan/laravel-more",
@@ -49,20 +49,20 @@
         },
         {
             "name": "dan/shopify",
-            "version": "v2.9.5",
+            "version": "v3.0.1",
             "source": {
                 "type": "git",
                 "url": "https://github.com/danrichards/shopify.git",
-                "reference": "f44a786e2ad15fdc248b645e5b56e9a9e39a4c76"
+                "reference": "d32cd4bc60b5fd6f7988ff62a61e35f07d26c479"
             },
             "dist": {
                 "type": "zip",
-                "url": "https://api.github.com/repos/danrichards/shopify/zipball/f44a786e2ad15fdc248b645e5b56e9a9e39a4c76",
-                "reference": "f44a786e2ad15fdc248b645e5b56e9a9e39a4c76",
+                "url": "https://api.github.com/repos/danrichards/shopify/zipball/d32cd4bc60b5fd6f7988ff62a61e35f07d26c479",
+                "reference": "d32cd4bc60b5fd6f7988ff62a61e35f07d26c479",
                 "shasum": ""
             },
             "require": {
-                "guzzlehttp/guzzle": "^6.2",
+                "guzzlehttp/guzzle": "^6.2|^7.0",
                 "nesbot/carbon": "^1.26.3 || ^2.0",
                 "php": ">=5.6.4"
             },
@@ -99,10 +99,9 @@
             "keywords": [
                 "api",
                 "laravel",
-                "shopify",
                 "webhooks"
             ],
-            "time": "2020-08-03T16:15:56+00:00"
+            "time": "2021-03-29T13:42:33+00:00"
         },
         {
             "name": "doctrine/inflector",
