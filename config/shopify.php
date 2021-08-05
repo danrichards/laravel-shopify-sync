@@ -181,6 +181,7 @@ return [
             'shipping_address1' => 128,
             'shipping_address2' => 128,
             'gateway' => 32,
+            'shipping_zip' => 32,
         ],
         'map_updatable' => '*',
         'model' => \Dan\Shopify\Laravel\Models\Order::class,
