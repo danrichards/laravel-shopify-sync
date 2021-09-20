@@ -281,7 +281,7 @@ class ImportStorePage extends AbstractStoreJob
      */
     protected function handleDispatchImportOrder($api_order): void
     {
-        $job = new ImportOrder($this->getStore(), $api_order);
+        $job = new ImportOrder($this->getStore()->withoutRelations(), $api_order);
 
         if ($this->dryrun) {
             $this->msg("order:{$api_order['id']}:dryrun", [], 'info');
