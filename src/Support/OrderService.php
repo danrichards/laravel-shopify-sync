@@ -10,7 +10,7 @@ use Dan\Shopify\Laravel\Models\Order;
 use Dan\Shopify\Laravel\Models\OrderItem;
 use Dan\Shopify\Laravel\Models\Store;
 use Dan\Shopify\Models\Order as ShopifyOrder;
-use \DB;
+use DB;
 use Exception;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Collection as BaseCollection;
@@ -527,8 +527,13 @@ class OrderService extends AbstractService
             $this->filtered_line_items_data = $this->getFilteredLineItemsData();
             $this->order_items = collect();
             $customer_model = config('shopify.customers.model');
-            $this->customer = new $customer_model;
-            $this->customer_data = $this->getCustomerDataFromOrderData($this->order_data);
+            $store_customer_id = array_get($this->order_data, 'customer.id');
+            if ($c = $customer_model::firstWhere(compact('store_customer_id'))) {
+                $this->customer = $c;
+            } else {
+                $this->customer = new $customer_model;
+                $this->customer_data = $this->getCustomerDataFromOrderData($this->order_data);
+            }
         }
 
         return $this;
